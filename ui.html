@@ -385,7 +385,28 @@ const TPL = {
     {name:"恢复4", duration_min:1.5, cadence:150, cue:"慢跑恢复一分半", pre_cue:"还有五秒，最后一次快跑", pre_cue_lead:5},
     {name:"快跑5", duration_min:1, cadence:184, cue:"最后一次快跑，步频一百八十四，全力冲刺", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
     {name:"冷身", duration_min:5, cadence:145, cue:"冷身五分钟，放慢脚步，步频一百四十五", pre_cue:"训练即将结束，强度很大，记得拉伸", pre_cue_lead:15}
-  ]}
+  ]},
+  eqhiit: { level:"进阶", name:"EQ 燃脂 HIIT 跑", desc:"你的私人定制 HIIT：热身 → 9 组『冲刺 30 秒（步频 180-182）↔ 慢跑恢复（1.5-2.5 分钟）』→ 冷身，共约 28.5 分钟。冲刺:恢复 ≈ 1:3~1:5，燃脂与后燃效应强，适合有间歇跑基础的进阶跑者。", phases:[
+    {name:"热身", duration_min:3, cadence:140, cue:"热身开始，轻松慢跑三分钟，步频一百四十，活动开身体！", pre_cue:"还有十五秒，准备第一次冲刺", pre_cue_lead:15},
+    {name:"冲刺1", duration_min:0.5, cadence:180, cue:"冲刺三十秒，步频一百八十，全力以赴！", pre_cue:"还有五秒，准备放松慢跑", pre_cue_lead:5},
+    {name:"恢复1", duration_min:1.5, cadence:150, cue:"恢复慢跑一分钟，步频降到一百五十，调整呼吸", pre_cue:"还有五秒，准备第二次冲刺", pre_cue_lead:5},
+    {name:"冲刺2", duration_min:0.5, cadence:180, cue:"冲刺三十秒，全力以赴！", pre_cue:"还有五秒，准备放松", pre_cue_lead:5},
+    {name:"恢复2", duration_min:1.5, cadence:150, cue:"恢复慢跑一分钟", pre_cue:"还有五秒，准备第三次冲刺", pre_cue_lead:5},
+    {name:"冲刺3", duration_min:0.5, cadence:180, cue:"冲刺三十秒，全力以赴", pre_cue:"还有五秒，准备放松", pre_cue_lead:5},
+    {name:"恢复3", duration_min:2, cadence:150, cue:"恢复慢跑2分钟", pre_cue:"还有五秒，最后一次冲刺", pre_cue_lead:5},
+    {name:"冲刺4", duration_min:0.5, cadence:182, cue:"冲刺三十秒，全力以赴", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"恢复4", duration_min:2, cadence:150, cue:"恢复慢跑2分钟", pre_cue:"还有五秒，最后一次冲刺", pre_cue_lead:5},
+    {name:"冲刺5", duration_min:0.5, cadence:182, cue:"冲刺三十秒，全力以赴", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"恢复5", duration_min:2, cadence:150, cue:"恢复慢跑2分钟", pre_cue:"还有五秒，最后一次冲刺", pre_cue_lead:5},
+    {name:"冲刺6", duration_min:0.5, cadence:182, cue:"冲刺三十秒，全力以赴", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"恢复6", duration_min:2, cadence:150, cue:"恢复慢跑2分钟", pre_cue:"还有五秒，最后一次冲刺", pre_cue_lead:5},
+    {name:"冲刺7", duration_min:0.5, cadence:182, cue:"冲刺三十秒，全力以赴", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"恢复7", duration_min:2.5, cadence:150, cue:"恢复慢跑2分30秒", pre_cue:"还有五秒，最后一次冲刺", pre_cue_lead:5},
+    {name:"冲刺8", duration_min:0.5, cadence:182, cue:"冲刺三十秒，全力以赴", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"恢复8", duration_min:2.5, cadence:150, cue:"恢复慢跑2分30秒", pre_cue:"还有五秒，最后一次冲刺", pre_cue_lead:5},
+    {name:"冲刺9", duration_min:0.5, cadence:182, cue:"冲刺三十秒，全力以赴", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"冷身", duration_min:3, cadence:140, cue:"冷身开始，放慢脚步，步频一百四十，让心率慢慢降下来", pre_cue:"训练即将结束，今天表现很棒", pre_cue_lead:15}
+  ] }
 };
 
 // ---------- 渲染 ----------
