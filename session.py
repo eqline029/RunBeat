@@ -20,6 +20,15 @@ from musicgen import SR
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# BPM 模块级缓存: 同一文件只检测一次(4-5分钟音频检测约20秒)
+_BPM_CACHE = {}
+
+
+def _bpm_for(path: str) -> float:
+    if path not in _BPM_CACHE:
+        _BPM_CACHE[path] = stretch.detect_bpm(path)
+    return _BPM_CACHE[path]
+
 
 # ---------------- 计划校验 ----------------
 
@@ -127,12 +136,17 @@ def render_song_phase(phase: dict, song_path: str, song_bpm: float,
     if not (40 <= target_bpm <= 220):
         raise ValueError(f"音乐BPM超出合理范围(40-220): {target_bpm:.1f}")
 
-    os.makedirs(work_dir, exist_ok=True)
-    aligned = os.path.join(work_dir, f"song_{os.path.basename(song_path)}.aligned.wav")
-    try:
-        info = stretch.stretch(song_path, target_bpm, aligned)
-    except Exception as e:
-        raise RuntimeError(f"歌曲变速失败: {e}")
+    _ALIGN_DIR = os.path.join(HERE, "output", "_aligned")
+    os.makedirs(_ALIGN_DIR, exist_ok=True)
+    _tag = os.path.splitext(os.path.basename(song_path))[0][:24]
+    aligned = os.path.join(_ALIGN_DIR, f"{_tag}_{target_bpm:.0f}.wav")
+    if os.path.exists(aligned) and os.path.getsize(aligned) >= 1024:
+        info = {"source_bpm": song_bpm, "bpm_used": song_bpm, "factor": 1.0, "clamped": False}
+    else:
+        try:
+            info = stretch.stretch(song_path, target_bpm, aligned)
+        except Exception as e:
+            raise RuntimeError(f"歌曲变速失败: {e}")
 
     warning = None
     if info["clamped"]:
@@ -231,7 +245,7 @@ def build_session(plan: dict, seed: int = 7, cache_dir: str = None,
 
         if global_song_path:
             song_path = global_song_path
-            song_bpm = global_song_bpm or stretch.detect_bpm(song_path)
+            song_bpm = global_song_bpm or _bpm_for(song_path)
             mg = float(p.get("metronome_gain", plan.get("metronome_gain", 0.18)))
             sec, warn = render_song_phase(p_eff, song_path, song_bpm, ratio,
                                           work_dir, metronome_gain=mg)
@@ -246,7 +260,7 @@ def build_session(plan: dict, seed: int = 7, cache_dir: str = None,
             song_bpm = p.get("song_bpm") or (
                 song_registry.get(p["song_id"], {}).get("bpm") if p.get("song_id") else None)
             if not song_bpm:
-                song_bpm = stretch.detect_bpm(song_path)
+                song_bpm = _bpm_for(song_path)
             mg = float(p.get("metronome_gain", plan.get("metronome_gain", 0.18)))
             sec, warn = render_song_phase(p_eff, song_path, song_bpm, ratio,
                                           work_dir, metronome_gain=mg)

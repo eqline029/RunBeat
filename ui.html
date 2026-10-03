@@ -579,13 +579,42 @@ async function uploadSong(file){
     const j = await resp.json();
     if(j.error) throw new Error(j.error);
     state.globalSong = { song_id: j.song_id, song_name: j.name, song_bpm: j.bpm };
-    $("songName").textContent = j.name + (j.bpm ? `（BPM ${j.bpm}）` : "（BPM 检测失败，导出时自动检测）");
     $("songClear").style.display = "inline-block";
-    setStatus("ok", "全局歌曲已上传：" + j.name);
     scheduleSave();
+    if(j.status === "analyzing"){
+      $("songName").textContent = j.name + "（正在分析节奏…约20秒）";
+      setStatus("info", "已上传「" + j.name + "」，正在分析节奏，完成后即可顺畅试听");
+      pollSongBpm(j.song_id, j.name);
+    } else {
+      $("songName").textContent = j.name + (j.bpm ? `（BPM ${j.bpm}）` : "（BPM 检测失败，导出时自动检测）");
+      setStatus("ok", "全局歌曲已上传：" + j.name);
+    }
   }catch(e){
     setStatus("err","上传失败：" + e.message);
   }
+}
+
+// 上传后轮询 BPM 分析状态(后台检测约20秒), 完成后更新显示
+async function pollSongBpm(song_id, name){
+  try{
+    for(let i=0;i<60;i++){
+      await new Promise(r=>setTimeout(r,3000));
+      const r = await fetch("/api/song/status?song_id=" + encodeURIComponent(song_id));
+      const j = await r.json();
+      if(j.status === "ready"){
+        state.globalSong.song_bpm = j.bpm;
+        $("songName").textContent = name + `（BPM ${j.bpm}）`;
+        setStatus("ok", "节奏分析完成：" + name + `（BPM ${j.bpm}）`);
+        scheduleSave();
+        return;
+      }
+      if(j.status === "error"){
+        $("songName").textContent = name + "（BPM 检测失败，导出时自动检测）";
+        setStatus("warn", "节奏分析失败，导出/试听时仍会自动检测");
+        return;
+      }
+    }
+  }catch(e){ /* 轮询失败忽略: 试听/导出时自动检测兜底 */ }
 }
 
 // ---------- 全局试听互斥 ----------

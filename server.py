@@ -37,7 +37,7 @@ CACHE_DIR = os.path.join(HERE, "output", "_cue_cache")
 REGISTRY_PATH = os.path.join(SONGS_DIR, "_registry.json")
 
 ALLOWED_EXT = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"}
-VERSION = "1.23.0"
+VERSION = "1.23.1"
 
 
 def get_lan_ips() -> list:
@@ -75,8 +75,10 @@ def _load_registry() -> dict:
 
 def _save_registry(reg: dict):
     os.makedirs(SONGS_DIR, exist_ok=True)
-    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
+    tmp = REGISTRY_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(reg, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, REGISTRY_PATH)  # 原子替换, 避免并发写坏
 
 
 SONG_REGISTRY = _load_registry()
@@ -169,6 +171,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "version": VERSION})
         elif path == "/api/info":
             self._json(self._info())
+        elif path == "/api/song/status":
+            self._song_status()
         elif path == "/api/qr":
             self._qr()
         elif path.startswith("/api/jobs/"):
@@ -280,6 +284,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send(503, b"qrcode library missing; run: pip install qrcode pillow",
                        "text/plain")
 
+    def _song_status(self):
+        q = parse_qs(self.path.split("?", 1)[-1])
+        sid = (q.get("song_id") or [""])[0]
+        info = SONG_REGISTRY.get(sid)
+        if not info:
+            self._json({"error": "歌曲不存在"}, 404)
+            return
+        self._json({"song_id": sid, "name": info.get("name"), "bpm": info.get("bpm"),
+                    "status": info.get("status", "ready")})
+
     def _upload_song(self):
         name = unquote(self.headers.get("X-Filename", "song"))
         base = os.path.basename(name)
@@ -302,9 +316,25 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             bpm = None
             print(f"  [song] BPM 检测失败: {e}")
-        SONG_REGISTRY[song_id] = {"file": fpath, "bpm": bpm, "name": base}
+        SONG_REGISTRY[song_id] = {"file": fpath, "bpm": None, "name": base, "status": "analyzing"}
         _save_registry(SONG_REGISTRY)
-        self._json({"song_id": song_id, "bpm": bpm, "name": base})
+
+        def _analyze():
+            try:
+                bpm = round(session._bpm_for(fpath), 1)
+                with JOBS_LOCK:
+                    SONG_REGISTRY[song_id]["bpm"] = bpm
+                    SONG_REGISTRY[song_id]["status"] = "ready"
+                _save_registry(SONG_REGISTRY)
+            except Exception as e:
+                print(f"  [song] BPM 检测失败: {e}")
+                with JOBS_LOCK:
+                    SONG_REGISTRY[song_id]["status"] = "error"
+                _save_registry(SONG_REGISTRY)
+
+        threading.Thread(target=_analyze, daemon=True).start()
+        # 立即返回, BPM 后台检测(约20秒), 前端轮询 /api/song/status
+        self._json({"song_id": song_id, "bpm": None, "name": base, "status": "analyzing"})
 
     def _preview(self):
         try:
