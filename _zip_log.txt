@@ -1,0 +1,27 @@
+files: 25
+  .github/workflows/ci.yml
+  .gitignore
+  CHANGELOG.md
+  LICENSE
+  README.md
+  data/songs/1a32604e4f14.wav
+  examples/demo-plan.json
+  examples/runbeat-demo.mp3
+  examples/styles-demo-v1.23.mp3
+  musicgen.py
+  plans/fatburn_demo.json
+  plans/song_demo.json
+  requirements.txt
+  runbeat.py
+  server.py
+  session.py
+  stretch.py
+  ui.html
+  voice.py
+  启动-Linux.sh
+  启动-Windows.bat
+  启动-mac.command
+  安装依赖-Linux.sh
+  安装依赖-Windows.bat
+  开源上传清单.md
+size: 12.63 MB
