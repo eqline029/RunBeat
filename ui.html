@@ -55,6 +55,16 @@
   .dur-row { display:flex; align-items:center; gap:4px; }
   .dur-unit { font-size:12px; color:#667; }
   .phase-loading { display:none; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--accent-dark,#1f6f52); }
+  .analyze-wrap { margin-top:10px; max-width:360px; }
+  .analyze-bar { height:8px; border-radius:4px; background:#e8eef2; overflow:hidden; position:relative; }
+  .analyze-slide { position:absolute; top:0; left:0; height:100%; width:38%; border-radius:4px;
+    background:linear-gradient(90deg,#2fbf71,#7ad0a5); animation:analyze-slide 1.1s ease-in-out infinite; }
+  @keyframes analyze-slide { 0%{ transform:translateX(-130%);} 100%{ transform:translateX(330%);} }
+  .analyze-text { display:block; margin-top:6px; font-size:12px; color:#5a6b76; }
+  .analyze-bar.analyze-done .analyze-slide { animation:none; transform:none; width:100%;
+    background:linear-gradient(90deg,#2fbf71,#7ad0a5); }
+  .analyze-bar.analyze-err .analyze-slide { animation:none; transform:none; width:100%;
+    background:#e07b54; }
   .spinner { width:14px; height:14px; border:2px solid #dde8e5; border-top-color:var(--accent,#2f8f6d); border-radius:50%; animation:rbspin .8s linear infinite; }
   @keyframes rbspin { to { transform:rotate(360deg); } }
   .tpl-item { position:relative; }
@@ -213,6 +223,10 @@
         <button class="btn small" id="songBtn">上传歌曲…</button>
         <span class="hint" id="songName" style="margin:0 0 0 8px">未选歌曲（仅用内置风格）</span>
         <button class="btn small" id="songClear" style="display:none;margin-left:8px">移除</button>
+      </div>
+      <div class="analyze-wrap" id="analyzeWrap" style="display:none">
+        <div class="analyze-bar" id="analyzeBar"><div class="analyze-slide"></div></div>
+        <span class="analyze-text" id="analyzeText">正在上传歌曲…</span>
       </div>
     </div>
     <div class="hint">选歌后：歌曲自动变速不变调、短歌自动循环，作为统一背景贯穿全部阶段；不选歌则用上方内置风格合成。</div>
@@ -568,7 +582,8 @@ window.addEventListener("scroll", updateNavCurrent, {passive:true});
 // ---------- 歌曲上传 ----------
 async function uploadSong(file){
   if(!file) return;
-  setStatus("info","正在上传歌曲并检测 BPM…");
+  setStatus("info","正在上传歌曲…");
+  showAnalyze("正在上传歌曲…");
   try{
     const buf = await file.arrayBuffer();
     const resp = await fetch("/api/song/upload", {
@@ -582,8 +597,9 @@ async function uploadSong(file){
     $("songClear").style.display = "inline-block";
     scheduleSave();
     if(j.status === "analyzing"){
-      $("songName").textContent = j.name + "（正在分析节奏…约20秒）";
+      $("songName").textContent = j.name + "（正在分析节奏…）";
       setStatus("info", "已上传「" + j.name + "」，正在分析节奏，完成后即可顺畅试听");
+      showAnalyze("正在分析歌曲节奏（约 20 秒），请稍候…");
       pollSongBpm(j.song_id, j.name);
     } else {
       $("songName").textContent = j.name + (j.bpm ? `（BPM ${j.bpm}）` : "（BPM 检测失败，导出时自动检测）");
@@ -591,7 +607,28 @@ async function uploadSong(file){
     }
   }catch(e){
     setStatus("err","上传失败：" + e.message);
+    hideAnalyze();
   }
+}
+
+// 分析节奏进度条: 显示/隐藏/完成/失败状态
+function showAnalyze(text){
+  if(text) $("analyzeText").textContent = text;
+  $("analyzeBar").classList.remove("analyze-done","analyze-err");
+  $("analyzeWrap").style.display = "block";
+}
+function hideAnalyze(){
+  $("analyzeWrap").style.display = "none";
+}
+function setAnalyzeDone(){
+  $("analyzeBar").classList.add("analyze-done");
+  $("analyzeText").textContent = "节奏分析完成";
+  setTimeout(hideAnalyze, 1800);
+}
+function setAnalyzeErr(){
+  $("analyzeBar").classList.add("analyze-err");
+  $("analyzeText").textContent = "节奏分析失败，导出/试听时自动检测";
+  setTimeout(hideAnalyze, 2500);
 }
 
 // 上传后轮询 BPM 分析状态(后台检测约20秒), 完成后更新显示
@@ -605,12 +642,14 @@ async function pollSongBpm(song_id, name){
         state.globalSong.song_bpm = j.bpm;
         $("songName").textContent = name + `（BPM ${j.bpm}）`;
         setStatus("ok", "节奏分析完成：" + name + `（BPM ${j.bpm}）`);
+        setAnalyzeDone();
         scheduleSave();
         return;
       }
       if(j.status === "error"){
         $("songName").textContent = name + "（BPM 检测失败，导出时自动检测）";
         setStatus("warn", "节奏分析失败，导出/试听时仍会自动检测");
+        setAnalyzeErr();
         return;
       }
     }
@@ -1063,6 +1102,7 @@ $("songBtn").addEventListener("click", ()=>$("songFile").click());
 $("songFile").addEventListener("change", e=>{ uploadSong(e.target.files[0]); e.target.value=""; });
 $("songClear").addEventListener("click", ()=>{
   state.globalSong = { song_id:null, song_name:"", song_bpm:null };
+  hideAnalyze();
   $("songName").textContent = "未选歌曲（仅用内置风格）";
   $("songClear").style.display = "none";
   scheduleSave();
