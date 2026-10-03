@@ -1,0 +1,14 @@
+{
+  "title": "RunBeat 示例·短演示",
+  "voice": "zh-CN-YunxiNeural",
+  "voice_rate": "+0%",
+  "tempo_ratio": 0.5,
+  "duck_db": -7,
+  "cue_lead_sec": 0.8,
+  "crossfade_sec": 0.0,
+  "phases": [
+    { "name": "热身", "duration_min": 1, "cadence": 150, "cue": "热身开始，轻松慢跑一分钟，步频一百五十", "pre_cue": "还有十秒，准备冲刺", "pre_cue_lead": 10 },
+    { "name": "冲刺", "duration_min": 0.5, "cadence": 180, "cue": "冲刺三十秒，步频一百八十，全力以赴", "pre_cue": "还有五秒，准备放松", "pre_cue_lead": 5 },
+    { "name": "放松", "duration_min": 1, "cadence": 150, "cue": "放松慢跑一分钟，步频降到一百五十，调整呼吸", "pre_cue": "训练即将结束，很棒", "pre_cue_lead": 15 }
+  ]
+}
