@@ -21,6 +21,22 @@
 
 ---
 
+## 📥 下载安装包
+
+**方式一：直接下载（推荐）**
+- 本仓库页面点绿色 **Code** 按钮 → **Download ZIP**，解压后双击 `启动-Windows.bat`（Windows）/ `启动-mac.command`（macOS）/ 运行 `bash 启动-Linux.sh`（Linux），浏览器会自动打开操作台
+- 想下载正式发布版安装包？看仓库右侧 **Releases**，下载最新的 `runbeat-v1.22.zip`（约 9MB，含完整程序、内置歌曲与示例计划）
+
+**方式二：克隆源码**
+
+```bash
+git clone https://github.com/eqline029/RunBeat.git
+```
+
+> 两种方式拿到的都是完整程序：解压/克隆后直接运行启动脚本即可，无需额外配置（首次运行会自动安装依赖）。
+
+---
+
 ## 快速开始（3 步，小白也能装）
 
 **第 1 步：准备 Python**
