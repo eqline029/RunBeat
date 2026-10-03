@@ -37,7 +37,7 @@ CACHE_DIR = os.path.join(HERE, "output", "_cue_cache")
 REGISTRY_PATH = os.path.join(SONGS_DIR, "_registry.json")
 
 ALLOWED_EXT = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"}
-VERSION = "1.23.2"
+VERSION = "1.24.0"
 
 
 def get_lan_ips() -> list:
@@ -173,6 +173,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(self._info())
         elif path == "/api/song/status":
             self._song_status()
+        elif path == "/api/song/raw":
+            self._song_raw()
         elif path == "/api/qr":
             self._qr()
         elif path.startswith("/api/jobs/"):
@@ -283,6 +285,53 @@ class Handler(BaseHTTPRequestHandler):
         except ImportError:
             self._send(503, b"qrcode library missing; run: pip install qrcode pillow",
                        "text/plain")
+
+    def _song_raw(self):
+        """返回上传歌曲原文件(带 Range 支持, 供原曲试听播放条)"""
+        q = parse_qs(self.path.split("?", 1)[-1])
+        sid = (q.get("song_id") or [""])[0]
+        rec = SONG_REGISTRY.get(sid)
+        if not rec or not os.path.exists(rec.get("file", "")):
+            self._send(404, b"no such song", "text/plain")
+            return
+        real = os.path.realpath(rec["file"])
+        ext = os.path.splitext(real)[1].lower()
+        ctype = "audio/mpeg" if ext == ".mp3" else ("audio/wav" if ext == ".wav" else "application/octet-stream")
+        size = os.path.getsize(real)
+        range_h = self.headers.get("Range")
+        if range_h:
+            m = re.match(r"bytes=(\d*)-(\d*)", range_h.strip())
+            start = int(m.group(1)) if m and m.group(1) else 0
+            end = int(m.group(2)) if m and m.group(2) else size - 1
+            if start > end or start >= size:
+                self.send_response(416)
+                self.send_header("Content-Range", "bytes */%d" % size)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            end = min(end, size - 1)
+            length = end - start + 1
+            with open(real, "rb") as f:
+                f.seek(start)
+                body = f.read(length)
+            self.send_response(206)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(length))
+            self.send_header("Content-Range", "bytes %d-%d/%d" % (start, end, size))
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        with open(real, "rb") as f:
+            body = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _song_status(self):
         q = parse_qs(self.path.split("?", 1)[-1])

@@ -1,2 +1,0 @@
-detect_bpm: 19.8 s -> bpm=136.0
-stretch(160bpm): 5.9 s -> {'source_bpm': 136.0, 'bpm_used': 136.0, 'factor': 1.176, 'clamped': False, 'out': 'C:\\Users\\品老大\\Downloads\\runbeat-v1.3\\data\\out\\_timing_aligned.wav'}

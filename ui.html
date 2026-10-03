@@ -65,6 +65,16 @@
     background:linear-gradient(90deg,#2fbf71,#7ad0a5); }
   .analyze-bar.analyze-err .analyze-slide { animation:none; transform:none; width:100%;
     background:#e07b54; }
+  .song-mode-zone { margin-top:8px; padding-top:4px; }
+  .mode-switch { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .mode-opt { flex:1 1 190px; border:1px solid var(--line,#d8e0e6); border-radius:10px;
+    padding:8px 10px; cursor:pointer; background:#fff; display:flex; flex-direction:column; gap:4px;
+    transition:border-color .15s, background .15s; }
+  .mode-opt:hover { border-color:var(--accent,#2f8f6b); }
+  .mode-opt.on { border-color:var(--accent,#2f8f6b); background:#eefaf4; }
+  .mode-head { display:flex; align-items:center; gap:2px; font-size:13px; font-weight:600; color:#26333b; }
+  .mode-head input { accent-color:var(--accent,#2f8f6b); }
+  .mode-tip { font-size:12px; color:#5a6b76; line-height:1.5; }
   .spinner { width:14px; height:14px; border:2px solid #dde8e5; border-top-color:var(--accent,#2f8f6d); border-radius:50%; animation:rbspin .8s linear infinite; }
   @keyframes rbspin { to { transform:rotate(360deg); } }
   .tpl-item { position:relative; }
@@ -228,8 +238,31 @@
         <div class="analyze-bar" id="analyzeBar"><div class="analyze-slide"></div></div>
         <span class="analyze-text" id="analyzeText">正在上传歌曲…</span>
       </div>
+      <div class="song-mode-zone" id="songModeWrap" style="display:none">
+        <div class="field" style="margin-top:12px">
+          <label>背景对齐模式（决定歌曲与步频的节拍关系）</label>
+          <div class="mode-switch" id="modeSwitch">
+            <label class="mode-opt" data-mode="stretch">
+              <span class="mode-head"><input type="radio" name="songMode" value="stretch" checked> 变速对齐</span>
+              <span class="mode-tip">整曲变速不变调，节拍完全对齐目标步频，节奏最准；但会改变原曲播放速度</span>
+            </label>
+            <label class="mode-opt" data-mode="original">
+              <span class="mode-head"><input type="radio" name="songMode" value="original"> 原速背景</span>
+              <span class="mode-tip">歌曲保持原速原调、零失真，由节拍器鼓点负责踩点；适合所有歌曲（推荐钢琴/慢歌）</span>
+            </label>
+            <label class="mode-opt" data-mode="smart">
+              <span class="mode-head"><input type="radio" name="songMode" value="smart"> 智能对齐</span>
+              <span class="mode-tip">逐段微调+跳拍补拍（DJ 手法），接近原速又能尽量对拍；适合鼓点清晰的歌（差距过大时效果有限）</span>
+            </label>
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>原曲试听（未处理原文件）</label>
+          <audio id="songAudio" controls preload="none" style="width:100%"></audio>
+        </div>
+      </div>
     </div>
-    <div class="hint">选歌后：歌曲自动变速不变调、短歌自动循环，作为统一背景贯穿全部阶段；不选歌则用上方内置风格合成。</div>
+    <div class="hint">选歌后：歌曲作为统一背景贯穿全部阶段（对齐模式可三选一），不选歌则用上方内置风格合成。</div>
     <div class="hint">阶段衔接：刚性对拍拼接 —— 上一阶段末拍直接接下一阶段首拍，步频瞬间切换（配合每阶段"切换提示"使用）。</div>
   </div>
 
@@ -294,7 +327,7 @@ const state = {
   phases: [],
   voices: [],
   songStatus: {},   // 兼容旧版阶段歌曲状态
-  globalSong: { song_id:null, song_name:"", song_bpm:null }
+  globalSong: { song_id:null, song_name:"", song_bpm:null, song_mode:"stretch" }
 };
 let uidSeq = 1;
 
@@ -593,8 +626,12 @@ async function uploadSong(file){
     });
     const j = await resp.json();
     if(j.error) throw new Error(j.error);
-    state.globalSong = { song_id: j.song_id, song_name: j.name, song_bpm: j.bpm };
+    state.globalSong = { song_id: j.song_id, song_name: j.name, song_bpm: j.bpm,
+      song_mode: state.globalSong.song_mode || "stretch" };
     $("songClear").style.display = "inline-block";
+    $("songModeWrap").style.display = "block";
+    $("songAudio").src = "/api/song/raw?song_id=" + encodeURIComponent(j.song_id);
+    $("songAudio").load();
     scheduleSave();
     if(j.status === "analyzing"){
       $("songName").textContent = j.name + "（正在分析节奏…）";
@@ -783,7 +820,8 @@ function buildPlan(validate){
     crossfade_sec: crossfadeSec(),
     music_style: $("musicStyle").value,
     metronome_gain: (parseFloat($("metroGain").value)||18)/100,
-    ...(state.globalSong?.song_id ? { song_id: state.globalSong.song_id, song_bpm: state.globalSong.song_bpm } : {}),
+    ...(state.globalSong?.song_id ? { song_id: state.globalSong.song_id, song_bpm: state.globalSong.song_bpm,
+      song_mode: state.globalSong.song_mode || "stretch" } : {}),
     phases: state.phases.map(p=>({
       name: p.name || "阶段",
       duration_min: Math.max(0.2, p.duration_min||1),
@@ -954,9 +992,16 @@ function applyState(s){
   if(s.cueLead) $("cueLead").value = s.cueLead;
   if(s.metroGain) $("metroGain").value = s.metroGain;
   if(s.music_style) $("musicStyle").value = s.music_style;
-  if(s.globalSong && s.globalSong.song_id){ state.globalSong = s.globalSong;
-    $("songName").textContent = s.globalSong.song_name + (s.globalSong.song_bpm ? `（BPM ${s.globalSong.song_bpm}）` : "");
-    $("songClear").style.display = "inline-block"; }
+  if(s.globalSong && s.globalSong.song_id){
+    state.globalSong = { song_id: s.globalSong.song_id, song_name: s.globalSong.song_name||"",
+      song_bpm: s.globalSong.song_bpm||null, song_mode: s.globalSong.song_mode || "stretch" };
+    $("songName").textContent = state.globalSong.song_name + (state.globalSong.song_bpm ? `（BPM ${state.globalSong.song_bpm}）` : "");
+    $("songClear").style.display = "inline-block";
+    $("songModeWrap").style.display = "block";
+    $("songAudio").src = "/api/song/raw?song_id=" + encodeURIComponent(state.globalSong.song_id);
+    $("songAudio").load();
+    syncSongModeUI(state.globalSong.song_mode);
+  }
   state.phases = s.phases.map(p=>({ uid:uidSeq++, name:p.name||"阶段", duration_min:p.duration_min||2,
     cadence:p.cadence||160, source:"synth", cue:p.cue||"", pre_cue:p.pre_cue||"",
     pre_cue_lead:p.pre_cue_lead||15 }));
@@ -988,7 +1033,7 @@ function importPlanFile(file){
         duck_db: d.duck_db!=null ? String(d.duck_db) : undefined,
         crossfade: d.crossfade_sec!=null ? String(d.crossfade_sec) : undefined,
         cueLead: d.cue_lead_sec!=null ? String(d.cue_lead_sec) : undefined,
-        music_style: d.music_style, globalSong: d.song_id ? { song_id: d.song_id, song_name: d.song_name||"", song_bpm: d.song_bpm||null } : undefined,
+        music_style: d.music_style, globalSong: d.song_id ? { song_id: d.song_id, song_name: d.song_name||"", song_bpm: d.song_bpm||null, song_mode: d.song_mode || "stretch" } : undefined,
         phases: d.phases
       });
       render(); setStatus("ok", `已导入计划「${d.title||"未命名"}」`);
@@ -1010,6 +1055,29 @@ async function showLan(){
     }
   }catch(e){ /* 局域网地址获取失败不影响主功能 */ }
 }
+
+// ---------- 背景对齐模式 switch ----------
+function syncSongModeUI(mode){
+  document.querySelectorAll(".mode-opt").forEach(opt=>{
+    const on = opt.getAttribute("data-mode") === mode;
+    opt.classList.toggle("on", on);
+    const r = opt.querySelector("input");
+    if(on) r.checked = true;
+  });
+}
+document.querySelectorAll("input[name='songMode']").forEach(r=>{
+  r.addEventListener("change", ()=>{
+    if(!r.checked) return;
+    state.globalSong.song_mode = r.value;
+    syncSongModeUI(r.value);
+    setStatus("info", "对齐模式已切换：" + ({
+      stretch:"变速对齐（整曲变速到目标节拍）",
+      original:"原速背景（歌保原速，节拍器踩点）",
+      smart:"智能对齐（拍段微调+跳补拍）"
+    })[r.value]);
+    scheduleSave();
+  });
+});
 
 // ---------- 事件 ----------
 // addPhase/clearAll 由 renderTplButtons() 动态生成并绑定
@@ -1101,10 +1169,12 @@ $("musicStyle").addEventListener("change", ()=>{ scheduleSave(); });
 $("songBtn").addEventListener("click", ()=>$("songFile").click());
 $("songFile").addEventListener("change", e=>{ uploadSong(e.target.files[0]); e.target.value=""; });
 $("songClear").addEventListener("click", ()=>{
-  state.globalSong = { song_id:null, song_name:"", song_bpm:null };
+  state.globalSong = { song_id:null, song_name:"", song_bpm:null, song_mode:"stretch" };
   hideAnalyze();
   $("songName").textContent = "未选歌曲（仅用内置风格）";
   $("songClear").style.display = "none";
+  $("songModeWrap").style.display = "none";
+  $("songAudio").pause(); $("songAudio").removeAttribute("src"); $("songAudio").load();
   scheduleSave();
 });
 document.addEventListener("input", ()=>scheduleSave(), true);

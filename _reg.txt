@@ -1,4 +1,0 @@
-removed test song
-f22828d49b3a.mp3 already in reg, bpm=136.0
-f2609466a3f1.mp3 already in reg, bpm=136.0
-registry saved, entries: 3, size: 571

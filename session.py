@@ -65,6 +65,13 @@ def validate_plan(plan: dict) -> list:
 
 # ---------------- 歌曲背景层 ----------------
 
+def _decode_wav(src: str, out: str, sr: int = SR):
+    """ffmpeg 解码任意音频 -> 44.1k 单声道 wav(原速背景/智能对齐共用)"""
+    import subprocess
+    cmd = ["ffmpeg", "-y", "-i", src, "-ac", "1", "-ar", str(sr), out]
+    subprocess.run(cmd, check=True, capture_output=True)
+
+
 def _load_wav_mono(path: str, sr: int = SR) -> np.ndarray:
     with wave.open(path, "rb") as w:
         n = w.getnframes()
@@ -126,9 +133,13 @@ def _metronome_ticks(n: int, bpm: float, gain: float, sr: int = SR) -> np.ndarra
 
 def render_song_phase(phase: dict, song_path: str, song_bpm: float,
                       tempo_ratio: float, work_dir: str,
-                      metronome_gain: float = 0.18, sr: int = SR):
+                      metronome_gain: float = 0.18, sr: int = SR,
+                      mode: str = "stretch"):
     """
-    歌曲背景阶段: 变速对齐到目标BPM -> 循环填充 -> 叠加节拍器。
+    歌曲背景阶段, mode 三选一:
+      stretch  = 变速对齐(整曲 rubberband, 听感最"准"但改变原速)
+      original = 原速背景(完全不变速, 节拍由节拍器叠加负责, 歌是氛围底)
+      smart    = 拍段智能对齐(整体保原速, 8拍组级±3%微调+跳/补拍吸收, DJ手法)
     返回 (audio float32 mono, warning str|None)
     """
     cadence = float(phase["cadence"])
@@ -139,23 +150,44 @@ def render_song_phase(phase: dict, song_path: str, song_bpm: float,
     _ALIGN_DIR = os.path.join(HERE, "output", "_aligned")
     os.makedirs(_ALIGN_DIR, exist_ok=True)
     _tag = os.path.splitext(os.path.basename(song_path))[0][:24]
-    aligned = os.path.join(_ALIGN_DIR, f"{_tag}_{target_bpm:.0f}.wav")
-    if os.path.exists(aligned) and os.path.getsize(aligned) >= 1024:
-        info = {"source_bpm": song_bpm, "bpm_used": song_bpm, "factor": 1.0, "clamped": False}
-    else:
-        try:
-            info = stretch.stretch(song_path, target_bpm, aligned)
-        except Exception as e:
-            raise RuntimeError(f"歌曲变速失败: {e}")
-
     warning = None
-    if info["clamped"]:
-        warning = (f"歌曲「{os.path.basename(song_path)}」BPM {info['source_bpm']} 距目标 {target_bpm:.0f} 过远，"
-                   f"变速系数被限制在 {info['factor']}（建议换更接近的歌曲，效果更好）")
-    elif info["bpm_used"] != info["source_bpm"]:
-        warning = f"歌曲「{os.path.basename(song_path)}」已做八度校正: 检测 {info['source_bpm']} → 按 {info['bpm_used']} 对齐"
 
-    x = _load_wav_mono(aligned, sr)
+    if mode == "original":
+        # 原速背景: 不检测BPM、不变速; 仅解码 -> 循环填充 -> 节拍器叠加(踩点由节拍器负责)
+        dec = os.path.join(_ALIGN_DIR, f"{_tag}_orig.wav")
+        if not (os.path.exists(dec) and os.path.getsize(dec) >= 1024):
+            _decode_wav(song_path, dec)
+        x = _load_wav_mono(dec, sr)
+    elif mode == "smart":
+        # 拍段智能对齐: 整体保原速(每段±3%内微调), 8拍组级网格对齐 + 跳/补拍吸收累积偏差
+        aligned = os.path.join(_ALIGN_DIR, f"{_tag}_smart_{target_bpm:.0f}.wav")
+        if os.path.exists(aligned) and os.path.getsize(aligned) >= 1024:
+            info = {"source_bpm": song_bpm, "factor": 1.0}
+        else:
+            try:
+                info = stretch.beat_sync_align(song_path, target_bpm, aligned)
+            except Exception as e:
+                raise RuntimeError(f"智能对齐失败: {e}")
+        if info["source_bpm"] and abs(info["source_bpm"] - target_bpm) > 0.35 * target_bpm:
+            warning = (f"智能对齐: 歌曲BPM {info['source_bpm']:.0f} 与目标 {target_bpm:.0f} 差距较大，"
+                       f"对齐效果有限，建议改用「原速背景」模式")
+        x = _load_wav_mono(aligned, sr)
+    else:
+        # 变速对齐(默认): 整曲 rubberband 保调变速
+        aligned = os.path.join(_ALIGN_DIR, f"{_tag}_{target_bpm:.0f}.wav")
+        if os.path.exists(aligned) and os.path.getsize(aligned) >= 1024:
+            info = {"source_bpm": song_bpm, "bpm_used": song_bpm, "factor": 1.0, "clamped": False}
+        else:
+            try:
+                info = stretch.stretch(song_path, target_bpm, aligned)
+            except Exception as e:
+                raise RuntimeError(f"歌曲变速失败: {e}")
+        if info["clamped"]:
+            warning = (f"歌曲「{os.path.basename(song_path)}」BPM {info['source_bpm']} 距目标 {target_bpm:.0f} 过远，"
+                       f"变速系数被限制在 {info['factor']}（建议换更接近的歌曲，效果更好）")
+        elif info["bpm_used"] != info["source_bpm"]:
+            warning = f"歌曲「{os.path.basename(song_path)}」已做八度校正: 检测 {info['source_bpm']} → 按 {info['bpm_used']} 对齐"
+        x = _load_wav_mono(aligned, sr)
     dur_s = float(phase["duration_min"]) * 60.0
     out = _fit_to_duration(x, dur_s, sr)
     if metronome_gain > 0:
@@ -247,8 +279,9 @@ def build_session(plan: dict, seed: int = 7, cache_dir: str = None,
             song_path = global_song_path
             song_bpm = global_song_bpm or _bpm_for(song_path)
             mg = float(p.get("metronome_gain", plan.get("metronome_gain", 0.18)))
+            smode = plan.get("song_mode", "stretch")
             sec, warn = render_song_phase(p_eff, song_path, song_bpm, ratio,
-                                          work_dir, metronome_gain=mg)
+                                          work_dir, metronome_gain=mg, mode=smode)
             if warn:
                 warnings.append(f"阶段[{p.get('name')}] {warn}")
         elif p.get("source") == "song":
@@ -262,8 +295,9 @@ def build_session(plan: dict, seed: int = 7, cache_dir: str = None,
             if not song_bpm:
                 song_bpm = _bpm_for(song_path)
             mg = float(p.get("metronome_gain", plan.get("metronome_gain", 0.18)))
+            smode = plan.get("song_mode", "stretch")
             sec, warn = render_song_phase(p_eff, song_path, song_bpm, ratio,
-                                          work_dir, metronome_gain=mg)
+                                          work_dir, metronome_gain=mg, mode=smode)
             if warn:
                 warnings.append(f"阶段[{p.get('name')}] {warn}")
         else:
