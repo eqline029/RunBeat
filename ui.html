@@ -61,7 +61,7 @@
   .tpl-pop { display:none; position:absolute; top:calc(100% + 6px); left:0; width:340px; background:#fff; border:1px solid var(--line,#dce7e4); border-radius:10px; padding:12px 14px; box-shadow:0 8px 24px rgba(0,0,0,.14); z-index:60; text-align:left; font-size:13px; line-height:1.6; }
   .tpl-item:hover .tpl-pop { display:block; }
   .tpl-pop .lv { display:inline-block; font-size:11px; padding:1px 8px; border-radius:10px; color:#fff; margin-left:6px; vertical-align:middle; }
-  .lv-入门 { background:#7fb069; } .lv-基础 { background:#3d8b8f; } .lv-进阶 { background:#e0933c; } .lv-专业 { background:#b0567f; } .lv-大神 { background:#7a4fb0; }
+  .lv-入门 { background:#7fb069; } .lv-基础 { background:#3d8b8f; } .lv-进阶 { background:#e0933c; } .lv-专业 { background:#b0567f; } .lv-大神 { background:#7a4fb0; } .lv-自定义 { background:#7a7f85; }
   .tpl-pop table { width:100%; border-collapse:collapse; margin-top:6px; font-size:12px; }
   .tpl-pop td { padding:3px 6px; border-bottom:1px dashed #eef4f2; }
   .tpl-pop td:first-child { color:#667; width:88px; }
@@ -738,6 +738,55 @@ function showBar(on){
   if(on){ $("bar").querySelector("i").style.width = "6%"; }
 }
 
+// ---------- 自定义模板（用户从历史计划加入） ----------
+const USER_TPL_KEY = "runbeat_user_tpls_v1";
+function loadUserTpls(){ try{ const raw = localStorage.getItem(USER_TPL_KEY); return raw ? JSON.parse(raw) : {}; }catch(e){ return {}; } }
+function saveUserTpls(o){ try{ localStorage.setItem(USER_TPL_KEY, JSON.stringify(o)); }catch(e){} }
+function addUserTpl(h){
+  const tpls = loadUserTpls();
+  const st = (h && h.state) || collectState();
+  const name = ((h && h.title) || $("planTitle").value || "未命名计划").trim();
+  let totMin = 0; (st.phases||[]).forEach(p=>{ totMin += p.duration_min||0; });
+  const mm = Math.floor(totMin); const ss = Math.round((totMin-mm)*60);
+  const dur = ss ? (mm + "分" + ss + "秒") : (mm + "分钟");
+  const tpl = {
+    level:"自定义", name:name, user:true,
+    desc:"来自你的历史计划 · " + (st.phases||[]).length + " 个阶段 · 总时长 " + dur + "。右键该按钮可删除此模板。",
+    phases:(st.phases||[]).map(p=>({ name:p.name, duration_min:p.duration_min, cadence:p.cadence,
+      cue:p.cue||"", pre_cue:p.pre_cue||"", pre_cue_lead:p.pre_cue_lead||15 })),
+    meta:{ voice:st.voice||"", voice_rate:st.voice_rate||"+0%", tempo_ratio:st.tempo_ratio||"0.5",
+      duck_db:st.duck_db||"-7", seed:(st.seed===undefined?"":st.seed), crossfade:st.crossfade||"0",
+      cueLead:st.cueLead||"0.8", metroGain:st.metroGain||"18", music_style:st.music_style||"" }
+  };
+  const existing = Object.keys(tpls).find(k=>tpls[k].name === name);
+  if(existing !== undefined){ tpls[existing] = tpl; } else { tpls["user_"+((h&&h.id)||Date.now())] = tpl; }
+  saveUserTpls(tpls);
+  renderTplButtons();
+  setStatus("ok", "已加入快速模板「" + name + "」，右键可删除");
+}
+function showTplMenu(x, y, key, tpl){
+  closeTplMenu();
+  const m = document.createElement("div"); m.id = "tplMenu";
+  m.style.cssText = "position:fixed;z-index:9999;background:#fff;border:1px solid #d9d9d9;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:4px 0;min-width:170px;font-size:13px;";
+  const del = document.createElement("button");
+  del.textContent = "🗑 删除「" + tpl.name + "」";
+  del.style.cssText = "display:block;width:100%;text-align:left;padding:8px 14px;background:none;border:none;cursor:pointer;color:#c0392b;";
+  del.addEventListener("click", ()=>{
+    closeTplMenu();
+    if(confirm("删除自定义模板「" + tpl.name + "」？此操作不影响历史计划。")){
+      const list = loadUserTpls(); delete list[key]; saveUserTpls(list);
+      renderTplButtons(); setStatus("ok", "已删除模板「" + tpl.name + "」");
+    }
+  });
+  m.appendChild(del);
+  document.body.appendChild(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.min(x, window.innerWidth - r.width - 8) + "px";
+  m.style.top = Math.min(y, window.innerHeight - r.height - 8) + "px";
+}
+function closeTplMenu(){ const m = document.getElementById("tplMenu"); if(m) m.remove(); }
+document.addEventListener("click", closeTplMenu);
+
 // ---------- 历史计划 ----------
 const HIST_KEY = "runbeat_history_v1";
 function loadHistory(){ try{ const raw = localStorage.getItem(HIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; } }
@@ -798,6 +847,10 @@ function renderHistory(){
     }));
     ops.appendChild(mkOp("✎ 载入编辑", ()=>{
       if(h.state && applyState(JSON.parse(JSON.stringify(h.state)))){ render(); setStatus("ok","已载入历史计划，可继续编辑"); }
+    }));
+    ops.appendChild(mkOp("＋ 模板", ()=>{
+      if(!h.state || !(h.state.phases||[]).length){ setStatus("err","该记录没有计划配置，无法加入模板"); return; }
+      addUserTpl(h);
     }));
     ops.appendChild(mkOp("🗑 删除", ()=>{
       if(confirm("删除历史计划「" + (h.title||"未命名") + "」？")){ const l = loadHistory(); l.splice(i,1); saveHistory(l); renderHistory(); }
@@ -908,15 +961,34 @@ $("copyLan").addEventListener("click", ()=>{
 function renderTplButtons(){
   const row = $("tplRow");
   row.textContent = "";
-  Object.keys(TPL).forEach(key => {
-    const tpl = TPL[key];
+  const userTpls = loadUserTpls();
+  const keys = Object.keys(TPL).concat(Object.keys(userTpls));
+  keys.forEach(key => {
+    const tpl = TPL[key] || userTpls[key];
     const wrap = document.createElement("div"); wrap.className = "tpl-item";
     const btn = document.createElement("button"); btn.className = "btn tpl"; btn.textContent = tpl.name;
     btn.addEventListener("click", ()=>{
       state.phases = tpl.phases.map(t=>mkPhaseObj(t));
+      if(tpl.meta){
+        const m = tpl.meta;
+        if(m.voice) $("voice").value = m.voice;
+        if(m.voice_rate) $("voiceRate").value = m.voice_rate;
+        if(m.tempo_ratio) $("tempoRatio").value = m.tempo_ratio;
+        if(m.duck_db) $("duckDb").value = m.duck_db;
+        if(m.seed !== undefined && m.seed !== "") $("seed").value = m.seed;
+        if(m.crossfade) $("crossfade").value = m.crossfade;
+        if(m.cueLead) $("cueLead").value = m.cueLead;
+        if(m.metroGain) $("metroGain").value = m.metroGain;
+        if(m.music_style) $("musicStyle").value = m.music_style;
+        $("planTitle").value = tpl.name;
+      }
       render();
       setStatus("ok", `已载入「${tpl.name}」模板（${tpl.level}级），可自由修改`);
     });
+    if(tpl.user){
+      btn.title = "右键可删除此模板";
+      btn.addEventListener("contextmenu", e=>{ e.preventDefault(); e.stopPropagation(); showTplMenu(e.clientX, e.clientY, key, tpl); });
+    }
     wrap.appendChild(btn);
     const pop = document.createElement("div"); pop.className = "tpl-pop";
     const h = document.createElement("div"); h.style.fontWeight = "600"; h.style.fontSize = "14px";

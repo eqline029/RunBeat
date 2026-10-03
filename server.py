@@ -37,7 +37,7 @@ CACHE_DIR = os.path.join(HERE, "output", "_cue_cache")
 REGISTRY_PATH = os.path.join(SONGS_DIR, "_registry.json")
 
 ALLOWED_EXT = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"}
-VERSION = "1.21.0"
+VERSION = "1.22.0"
 
 
 def get_lan_ips() -> list:
