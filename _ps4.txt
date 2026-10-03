@@ -1,8 +1,0 @@
-﻿git.exe : To https://github.com/eqline029/RunBeat.git
-所在位置 行:1 字符: 544
-+ ... .txt" 2>&1; & $git -C "C:\Users\品老大\Downloads\runbeat-v1.3" push orig ...
-+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (To https://gith...029/RunBeat.git:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-   093418f..e3472a9  main -> main
