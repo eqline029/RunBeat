@@ -1,0 +1,67 @@
+{
+  "title": "减脂间歇跑 · 11分钟",
+  "voice": "zh-CN-YunxiNeural",
+  "voice_rate": "+0%",
+  "tempo_ratio": 0.5,
+  "duck_db": -7,
+  "cue_lead_sec": 0.8,
+  "crossfade_sec": 2.0,
+  "phases": [
+    {
+      "name": "热身",
+      "duration_min": 2,
+      "cadence": 150,
+      "cue": "热身开始，轻松慢跑两分钟，步频一百五十，活动开身体",
+      "pre_cue": "还有十五秒，准备进入匀速跑",
+      "pre_cue_lead": 15
+    },
+    {
+      "name": "匀速跑",
+      "duration_min": 3,
+      "cadence": 165,
+      "cue": "匀速跑开始，步频提到一百六十五，保持稳定节奏",
+      "pre_cue": "还有十五秒，准备开始间歇冲刺，打起精神",
+      "pre_cue_lead": 15
+    },
+    {
+      "name": "冲刺1",
+      "duration_min": 1,
+      "cadence": 178,
+      "cue": "冲刺一分钟，步频一百七十八，全力以赴",
+      "pre_cue": "还有十秒，准备放松慢跑",
+      "pre_cue_lead": 10
+    },
+    {
+      "name": "恢复1",
+      "duration_min": 1,
+      "cadence": 150,
+      "cue": "恢复阶段，放松慢跑一分钟，调整呼吸，步频降到一百五十",
+      "pre_cue": "还有十秒，准备第二次冲刺",
+      "pre_cue_lead": 10
+    },
+    {
+      "name": "冲刺2",
+      "duration_min": 1,
+      "cadence": 178,
+      "cue": "第二次冲刺，步频一百七十八，坚持住",
+      "pre_cue": "还有十秒，准备放松慢跑",
+      "pre_cue_lead": 10
+    },
+    {
+      "name": "恢复2",
+      "duration_min": 1,
+      "cadence": 150,
+      "cue": "恢复阶段，放松慢跑一分钟，调整呼吸",
+      "pre_cue": "还有十五秒，进入冷身",
+      "pre_cue_lead": 15
+    },
+    {
+      "name": "冷身",
+      "duration_min": 2,
+      "cadence": 145,
+      "cue": "冷身开始，放慢脚步，步频一百四十五，让心率慢慢降下来",
+      "pre_cue": "训练即将结束，今天表现很棒",
+      "pre_cue_lead": 15
+    }
+  ]
+}

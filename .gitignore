@@ -1,0 +1,25 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+
+# ---- 生成产物 / 缓存 ----
+output/
+*.log
+
+# ---- 用户个人数据（隐私，切勿提交到 git！）----
+# 你在操作台导出的跑步音频（含个人训练计划、可能录制的语音）
+data/out/*.wav
+data/out/*.mp3
+# 你上传的歌曲（可能受版权保护）
+data/songs/
+# 你自建的训练计划（保留内置示例）
+plans/*.json
+!plans/fatburn_demo.json
+!plans/song_demo.json
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

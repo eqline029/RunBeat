@@ -1,0 +1,30 @@
+{
+  "title": "歌曲背景示例 · 2分钟",
+  "voice": "zh-CN-YunxiNeural",
+  "voice_rate": "+0%",
+  "tempo_ratio": 0.5,
+  "duck_db": -7,
+  "cue_lead_sec": 0.8,
+  "crossfade_sec": 2.0,
+  "phases": [
+    {
+      "name": "热身",
+      "duration_min": 1,
+      "cadence": 150,
+      "cue": "热身开始，合成音乐，轻松慢跑一分钟",
+      "pre_cue": "还有十秒，进入歌曲阶段",
+      "pre_cue_lead": 10
+    },
+    {
+      "name": "燃脂歌曲段",
+      "duration_min": 1,
+      "cadence": 165,
+      "source": "song",
+      "song_path": "output/示例歌曲_匀速跑片段.wav",
+      "metronome_gain": 0.18,
+      "cue": "歌曲阶段开始，跟着节拍跑起来",
+      "pre_cue": "马上结束，做得很好",
+      "pre_cue_lead": 10
+    }
+  ]
+}

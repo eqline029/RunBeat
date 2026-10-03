@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Syntax check
+        run: python -m py_compile runbeat.py server.py session.py musicgen.py voice.py stretch.py
+      - name: Smoke test (engine renders a short phase)
+        run: |
+          python -c "import musicgen, session, voice, stretch; print('modules ok')"
+          python -c "
+          from musicgen import render_phase
+          phase = {'name':'t','duration_min':0.1,'cadence':160}
+          a = render_phase(phase, sr=22050, seed=7)
+          print('render ok, len=%d samples (%.2fs)' % (len(a), len(a)/22050.0))
+          "

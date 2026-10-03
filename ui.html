@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RunBeat 跑步节拍训练音乐操作台</title>
+<style>
+  :root { --accent:#0b8f7c; --accent-dark:#086b5c; --bg:#f4f7f6; --card:#fff; --line:#e2e8e6; --text:#1d2b29; --muted:#6b7c78; --danger:#c0392b; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif; background:var(--bg); color:var(--text); padding:20px; }
+  .wrap { max-width:960px; margin:0 auto; }
+  header { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+  h1 { font-size:22px; color:var(--accent-dark); }
+  header .sub { color:var(--muted); font-size:13px; }
+  .total { margin-left:auto; font-size:14px; color:var(--muted); }
+  .total b { color:var(--accent-dark); font-size:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin-bottom:10px; color:var(--accent-dark); }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .field { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  .field label { font-size:12px; }
+  input[type=number], input[type=text], select, textarea {
+    border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px; font-family:inherit;
+    background:#fff; color:var(--text); min-width:0;
+  }
+  input:focus, select:focus, textarea:focus { outline:2px solid rgba(11,143,124,.25); border-color:var(--accent); }
+  textarea { resize:vertical; }
+  .btn { border:none; border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer; background:#e7efed; color:var(--text); }
+  .btn:hover { background:#d7e5e2; }
+  .btn.primary { background:var(--accent); color:#fff; }
+  .btn.primary:hover { background:var(--accent-dark); }
+  .btn.danger { background:#fbecea; color:var(--danger); }
+  .btn.small { padding:4px 9px; font-size:12px; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .tpl { background:#eef7f5; border:1px solid #cfe8e3; color:var(--accent-dark); }
+  .tpl:hover { background:#e0f1ed; }
+  .phase { border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:12px; background:var(--card); }
+  .phase-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .idx { background:var(--accent); color:#fff; border-radius:6px; font-size:13px; padding:3px 9px; font-weight:600; }
+  .phase-head input[type=text] { font-size:15px; font-weight:600; flex:1; }
+  .phase-rows { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .src-toggle { display:flex; gap:8px; align-items:center; font-size:13px; }
+  .src-toggle label { cursor:pointer; padding:5px 10px; border-radius:6px; border:1px solid var(--line); }
+  .src-toggle label.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .song-box { background:#f7faf9; border:1px dashed var(--line); border-radius:8px; padding:10px; margin-top:10px; font-size:13px; }
+  .history-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-top:8px; background:#fbfcfc; flex-wrap:wrap; }
+  .history-title { font-size:14px; font-weight:600; }
+  .history-ops { display:flex; gap:6px; flex-wrap:wrap; }
+  #phaseNav { position:fixed; right:10px; top:50%; transform:translateY(-50%); z-index:90; display:flex; flex-direction:column; gap:5px; max-height:70vh; overflow:auto; padding:6px; background:rgba(255,255,255,.94); border:1px solid var(--line,#dce7e4); border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.12); }
+  #phaseNav .nav-it { position:relative; width:26px; height:26px; border-radius:8px; border:1px solid var(--line,#dce7e4); background:#fff; font-size:12px; color:var(--accent-dark,#1f6f52); cursor:pointer; flex:none; }
+  #phaseNav .nav-it:hover, #phaseNav .nav-it.on { background:var(--accent,#2f8f6d); color:#fff; }
+  #phaseNav .nav-it .tip { display:none; position:absolute; right:34px; top:50%; transform:translateY(-50%); background:#fff; border:1px solid var(--line,#dce7e4); padding:2px 8px; border-radius:6px; white-space:nowrap; font-size:12px; color:#333; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+  #phaseNav .nav-it:hover .tip { display:block; }
+  @media (max-width:720px){ #phaseNav { display:none; } }
+  .dur-row { display:flex; align-items:center; gap:4px; }
+  .dur-unit { font-size:12px; color:#667; }
+  .phase-loading { display:none; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--accent-dark,#1f6f52); }
+  .spinner { width:14px; height:14px; border:2px solid #dde8e5; border-top-color:var(--accent,#2f8f6d); border-radius:50%; animation:rbspin .8s linear infinite; }
+  @keyframes rbspin { to { transform:rotate(360deg); } }
+  .tpl-item { position:relative; }
+  .tpl-pop { display:none; position:absolute; top:calc(100% + 6px); left:0; width:340px; background:#fff; border:1px solid var(--line,#dce7e4); border-radius:10px; padding:12px 14px; box-shadow:0 8px 24px rgba(0,0,0,.14); z-index:60; text-align:left; font-size:13px; line-height:1.6; }
+  .tpl-item:hover .tpl-pop { display:block; }
+  .tpl-pop .lv { display:inline-block; font-size:11px; padding:1px 8px; border-radius:10px; color:#fff; margin-left:6px; vertical-align:middle; }
+  .lv-入门 { background:#7fb069; } .lv-基础 { background:#3d8b8f; } .lv-进阶 { background:#e0933c; } .lv-专业 { background:#b0567f; } .lv-大神 { background:#7a4fb0; }
+  .tpl-pop table { width:100%; border-collapse:collapse; margin-top:6px; font-size:12px; }
+  .tpl-pop td { padding:3px 6px; border-bottom:1px dashed #eef4f2; }
+  .tpl-pop td:first-child { color:#667; width:88px; }
+  .song-status { color:var(--muted); font-size:12px; margin-top:6px; }
+  .song-status.ok { color:var(--accent-dark); }
+  .song-status.err { color:var(--danger); }
+  .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+  .cue-row { margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:700px){ .cue-row{grid-template-columns:1fr;} }
+  @media (max-width:640px){
+    body { padding:10px; }
+    .btn { padding:10px 14px; font-size:14px; }
+    .btn.small { padding:8px 11px; }
+    .phase-head { flex-wrap:wrap; }
+    .phase-head input[type=text] { flex-basis:100%; }
+    .phase-rows { grid-template-columns:1fr 1fr; }
+    header { gap:6px; }
+    .total { margin-left:0; width:100%; }
+    #lanCard .row { flex-direction:column; align-items:flex-start; }
+    .song-box .row { flex-wrap:wrap; }
+  }
+  .cue-row .field textarea { min-height:44px; }
+  .status { margin:12px 0; padding:10px 14px; border-radius:8px; font-size:13px; display:none; }
+  .status.show { display:block; }
+  .status.info { background:#eef7f5; color:var(--accent-dark); }
+  .status.err { background:#fbecea; color:var(--danger); }
+  .status.ok { background:#eaf7ec; color:#1e7b34; }
+  .result { margin-top:14px; display:none; }
+  .result.show { display:block; }
+  .result audio { width:100%; margin:8px 0; }
+  .bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:8px; display:none; }
+  .bar.show { display:block; }
+  .bar i { display:block; height:100%; width:0%; background:var(--accent); transition:width .3s; }
+  .hidden { display:none; }
+  .link-dl { color:var(--accent); font-size:13px; text-decoration:none; }
+  footer { color:var(--muted); font-size:12px; margin-top:20px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏃 RunBeat 跑步节拍训练音乐操作台</h1>
+    <span class="sub">设计你的训练计划 → 试听 → 导出 MP3</span>
+    <span class="total" title="各阶段计划时长之和（计划值）；实际导出时长以导出结果为准">预计总时长 <b id="totalDur">0</b> 分钟</span>
+  </header>
+
+  <!-- 全局设置 -->
+  <div class="card">
+    <h2>全局设置</h2>
+    <div class="row">
+      <div class="field">
+        <label>计划名称</label>
+        <input type="text" id="planTitle" value="我的跑步计划" style="width:150px">
+      </div>
+      <div class="field">
+        <label>提示音色</label>
+        <select id="voice"></select>
+      </div>
+      <div class="field">
+        <label>语速</label>
+        <select id="voiceRate">
+          <option value="-10%">慢 10%</option>
+          <option value="+0%" selected>正常</option>
+          <option value="+10%">快 10%</option>
+          <option value="+20%">快 20%</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>音乐节拍密度</label>
+        <select id="tempoRatio">
+          <option value="0.5" selected>每拍两步（舒适）</option>
+          <option value="1.0">每拍一步（冲刺感）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>提示时音乐压低</label>
+        <select id="duckDb">
+          <option value="-5">-5 dB</option>
+          <option value="-7" selected>-7 dB（推荐）</option>
+          <option value="-10">-10 dB</option>
+          <option value="-14">-14 dB</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>导出格式</label>
+        <select id="format">
+          <option value="mp3" selected>MP3（推荐）</option>
+          <option value="wav">WAV（无损）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label title="相同种子=同一首编曲；改一个数字就会换一种编曲">随机种子</label>
+        <input type="number" id="seed" value="7" min="0" style="width:80px">
+        <div class="hint" style="margin:2px 0 0">同种子=同编曲</div>
+      </div>
+      <div class="field">
+        <label>阶段衔接</label>
+        <div class="hint" style="margin:0">刚性对拍拼接（末拍→首拍）</div>
+        <input type="hidden" id="crossfade" value="0">
+      </div>
+      <div class="field">
+        <label>提示延迟(秒)</label>
+        <input type="number" id="cueLead" value="0.8" min="0" max="5" step="0.1" style="width:80px">
+      </div>
+      <div class="field">
+        <label>节拍器默认音量(%)</label>
+        <div class="hint" style="margin:0">叠加在背景音乐上的节拍点击声；内置风格下控制鼓组强度。改动后下次试听/导出立即生效</div>
+        <input type="number" id="metroGain" value="18" min="0" max="40" step="1" style="width:80px">
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn small" id="savePlan">💾 立即保存计划</button>
+      <button class="btn small" id="exportPlan">⬇ 导出计划JSON</button>
+      <button class="btn small" id="importPlan">⬆ 导入计划JSON</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      <span class="hint" style="margin:0">改动会自动保存在本浏览器，下次打开自动恢复</span>
+    </div>
+  </div>
+
+  <!-- 背景音乐(全局) -->
+  <div class="card">
+    <h2>背景音乐（全局 · 贯穿所有阶段）</h2>
+    <div class="row">
+      <div class="field">
+        <label>内置风格</label>
+        <select id="musicStyle">
+          <option value="default">基础电子（默认）</option>
+          <option value="sunlight">晨光</option>
+          <option value="breeze">清风</option>
+          <option value="forest">林间</option>
+          <option value="lemon">柠檬气泡</option>
+          <option value="cloud">云朵</option>
+          <option value="stream">溪谷</option>
+          <option value="wheat">麦浪</option>
+          <option value="paperplane">纸飞机</option>
+          <option value="ripple">水波</option>
+          <option value="pine">松风</option>
+        </select>
+        <button class="btn small" id="styleAudBtn">▶ 试听风格</button>
+      </div>
+      <audio id="styleAudio" controls style="width:100%;margin-top:6px"></audio>
+      <div class="field">
+        <label>我的歌曲（可选）</label>
+        <input type="file" id="songFile" accept="audio/*" style="display:none">
+        <button class="btn small" id="songBtn">上传歌曲…</button>
+        <span class="hint" id="songName" style="margin:0 0 0 8px">未选歌曲（仅用内置风格）</span>
+        <button class="btn small" id="songClear" style="display:none;margin-left:8px">移除</button>
+      </div>
+    </div>
+    <div class="hint">选歌后：歌曲自动变速不变调、短歌自动循环，作为统一背景贯穿全部阶段；不选歌则用上方内置风格合成。</div>
+    <div class="hint">阶段衔接：刚性对拍拼接 —— 上一阶段末拍直接接下一阶段首拍，步频瞬间切换（配合每阶段"切换提示"使用）。</div>
+  </div>
+
+  <!-- 模板 -->
+  <div class="card">
+    <h2>快速模板</h2>
+    <div class="row" id="tplRow"></div>
+    <div class="hint">鼠标悬浮在模板按钮上可查看课程介绍、阶段结构与适用水平。</div>
+  </div>
+
+  <!-- 阶段列表 -->
+  <div id="phaseList"></div>
+  <!-- 侧边阶段全览导航 -->
+  <div id="phaseNav"></div>
+
+  <!-- 操作与结果 -->
+  <div class="card">
+    <div class="row">
+      <button class="btn primary" id="exportBtn">⚡ 导出音频</button>
+      <button class="btn" id="previewAllBtn">▶ 试听完整音频</button>
+      <span class="hint" style="margin:0">导出成功后自动存入历史计划；试听完整音频 = 合成整段并播放（不生成最终文件）</span>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="bar" id="bar"><i></i></div>
+    <div class="result card" id="result" style="margin:14px 0 0">
+      <h2>导出结果（完整音频试听）</h2>
+      <audio id="resultAudio" controls></audio>
+      <div class="row" style="justify-content:space-between">
+        <span id="resultStats" class="hint"></span>
+        <a class="link-dl" id="resultDl" download>下载文件 ⬇</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 历史计划 -->
+  <div class="card" id="historyCard">
+    <h2>历史计划</h2>
+    <div class="hint" style="margin-bottom:8px">每次导出/试听完整成功后自动保存（最多 20 条）。「⧉ 复制并编辑」= 复制一份到当前编辑器；「✎ 载入编辑」= 载入当前编辑器；「🗑」= 删除。</div>
+    <div id="historyList"></div>
+  </div>
+
+  <!-- 手机访问 -->
+  <div class="card" id="lanCard" style="display:none">
+    <h2>📱 手机 / 其他电脑使用</h2>
+    <div class="row">
+      <div class="hint" style="margin:0;flex:1">手机连上<b>同一个 Wi-Fi</b>，用浏览器打开下面的地址（或扫二维码），就能在手机上配置、试听、下载 MP3：</div>
+      <img id="qrImg" alt="二维码" style="width:112px;height:112px;border:1px solid var(--line);border-radius:8px;flex-shrink:0">
+    </div>
+    <div class="row" style="margin-top:8px;gap:8px">
+      <a class="link-dl" id="lanLink" target="_blank" rel="noopener" style="font-size:15px"></a>
+      <button class="btn small" id="copyLan">复制地址</button>
+    </div>
+  </div>
+
+  <footer>RunBeat · 本地运行，音频与歌曲不上传任何服务器 · 停止服务：Ctrl+C</footer>
+</div>
+
+<script>
+"use strict";
+// ---------- 全局状态 ----------
+const state = {
+  phases: [],
+  voices: [],
+  songStatus: {},   // 兼容旧版阶段歌曲状态
+  globalSong: { song_id:null, song_name:"", song_bpm:null }
+};
+let uidSeq = 1;
+
+// ---------- 工具 ----------
+const $ = id => document.getElementById(id);
+function crossfadeSec(){ return 0; }  // v1.8: 阶段间刚性对拍拼接, 无交叉淡化
+function fmtDur(min){ return (Math.max(0,min)).toFixed(1); }
+function fmtMin(sec){
+  sec = Math.round(sec||0);
+  const m = Math.floor(sec/60), s = sec%60;
+  return (m ? m + " 分 " : "") + (s ? s + " 秒" : "0 秒");
+}
+function updateTotal(){
+  // 实际导出=每阶段向上对齐到一拍(beat)后之和, 与后端渲染规则一致
+  const r = parseFloat($("tempoRatio").value) || 0.5;
+  const totalMin = state.phases.reduce((a,p)=>{
+    const dur = +p.duration_min||0;
+    if(dur<=0) return a;
+    const beat = 60.0 / ((+p.cadence||150)*r);   // 秒/拍
+    return a + Math.ceil(dur*60 / beat) * beat / 60.0;
+  },0);
+  $("totalDur").textContent = fmtDur(totalMin);
+}
+function bpmOf(p){ const r=parseFloat($("tempoRatio").value); return Math.round((+p.cadence||0)*r); }
+
+// ---------- 模板(科学跑步课程: 入门 -> 大神) ----------
+const TPL = {
+  c25k: { level:"入门", name:"Couch to 5K 新手启蒙", desc:"经典跑走结合课程第1周：慢跑1分钟↔快走90秒交替4轮，零基础也能安全起步；建议每周3次、隔天休息。", phases:[
+    {name:"热身快走", duration_min:3, cadence:130, cue:"热身快走三分钟，步频一百三十，摆臂活动开", pre_cue:"还有十五秒，准备第一次慢跑", pre_cue_lead:15},
+    {name:"慢跑1", duration_min:1, cadence:155, cue:"慢跑一分钟，步频一百五十五，保持能说话的轻松速度", pre_cue:"还有十秒，转为快走", pre_cue_lead:10},
+    {name:"快走1", duration_min:1.5, cadence:130, cue:"快走一分半，步频一百三十，调整呼吸", pre_cue:"还有十秒，准备慢跑", pre_cue_lead:10},
+    {name:"慢跑2", duration_min:1, cadence:155, cue:"第二次慢跑，步频一百五十五", pre_cue:"还有十秒，转为快走", pre_cue_lead:10},
+    {name:"快走2", duration_min:1.5, cadence:130, cue:"快走一分半", pre_cue:"还有十秒，准备慢跑", pre_cue_lead:10},
+    {name:"慢跑3", duration_min:1, cadence:155, cue:"第三次慢跑，坚持住", pre_cue:"还有十秒，转为快走", pre_cue_lead:10},
+    {name:"快走3", duration_min:1.5, cadence:130, cue:"快走一分半", pre_cue:"还有十秒，最后一次慢跑", pre_cue_lead:10},
+    {name:"慢跑4", duration_min:1, cadence:158, cue:"最后一次慢跑，步频一百五十八", pre_cue:"还有十秒，进入冷身", pre_cue_lead:10},
+    {name:"冷身快走", duration_min:2, cadence:125, cue:"冷身快走两分钟，步频一百二十五", pre_cue:"训练即将结束，今天迈出了第一步", pre_cue_lead:15}
+  ]},
+  fastwalk: { level:"入门", name:"快走燃脂入门", desc:"零门槛燃脂课：全程快走不跑，适合超重人群、康复期或从未运动过的人，先走起来把体能基础打牢。", phases:[
+    {name:"热身快走", duration_min:5, cadence:115, cue:"热身快走五分钟，步频一百一十五，摆臂走起来", pre_cue:"还有十五秒，进入燃脂快走", pre_cue_lead:15},
+    {name:"燃脂快走", duration_min:20, cadence:125, cue:"燃脂快走开始，步频一百二十五，保持速度", pre_cue:"还有十五秒，准备放松", pre_cue_lead:15},
+    {name:"放松拉伸", duration_min:5, cadence:110, cue:"放松阶段，步频降到一百一十，自然走", pre_cue:"训练即将结束，很棒", pre_cue_lead:15}
+  ]},
+  steady: { level:"基础", name:"匀速燃脂跑", desc:"最经典的减脂课：持续中高强度匀速跑，让心率稳定在燃脂区，适合已能连续慢跑20分钟以上的跑者。", phases:[
+    {name:"热身", duration_min:3, cadence:150, cue:"热身开始，轻松慢跑三分钟", pre_cue:"还有十五秒进入匀速跑", pre_cue_lead:15},
+    {name:"匀速跑", duration_min:20, cadence:165, cue:"匀速跑开始，步频一百六十五，保持节奏", pre_cue:"还有十五秒，准备冷身", pre_cue_lead:15},
+    {name:"冷身", duration_min:3, cadence:145, cue:"冷身开始，放慢脚步，步频一百四十五", pre_cue:"训练即将结束，很棒", pre_cue_lead:15}
+  ]},
+  progressive: { level:"基础", name:"渐进提速跑", desc:"阶梯式提速：每4分钟升一档步频，从轻松跑到高强度，训练节奏感与心肺耐力，适合有稳定跑量基础者。", phases:[
+    {name:"热身", duration_min:3, cadence:150, cue:"热身开始，轻松慢跑三分钟", pre_cue:"还有十五秒，进入第一档", pre_cue_lead:15},
+    {name:"第一档", duration_min:4, cadence:158, cue:"第一档，步频一百五十八，稳住", pre_cue:"还有十五秒，升到第二档", pre_cue_lead:15},
+    {name:"第二档", duration_min:4, cadence:165, cue:"第二档，步频一百六十五", pre_cue:"还有十五秒，升到第三档", pre_cue_lead:15},
+    {name:"第三档", duration_min:4, cadence:172, cue:"第三档，步频一百七十二，坚持", pre_cue:"还有十五秒，最后一档", pre_cue_lead:15},
+    {name:"第四档", duration_min:4, cadence:178, cue:"最后一档，步频一百七十八，全力以赴", pre_cue:"还有十五秒，进入冷身", pre_cue_lead:15},
+    {name:"冷身", duration_min:3, cadence:145, cue:"冷身开始，放慢脚步", pre_cue:"训练即将结束，很棒", pre_cue_lead:15}
+  ]},
+  fartlek: { level:"进阶", name:"法特莱克变速跑", desc:"瑞典式自由变速：快跑↔慢跑交替，模拟真实路况节奏变化，提升速度耐力与跑感，是提升配速的经典课程。", phases:[
+    {name:"热身", duration_min:2, cadence:150, cue:"热身开始，轻松慢跑两分钟", pre_cue:"还有十秒，准备第一次加速", pre_cue_lead:10},
+    {name:"快1", duration_min:2, cadence:172, cue:"加速两分钟，步频一百七十二，感受节奏", pre_cue:"还有十秒，准备放松", pre_cue_lead:10},
+    {name:"慢1", duration_min:1.5, cadence:150, cue:"放松一分半，步频一百五十", pre_cue:"还有十秒，准备加速", pre_cue_lead:10},
+    {name:"快2", duration_min:2, cadence:172, cue:"加速两分钟，保持", pre_cue:"还有十秒，准备放松", pre_cue_lead:10},
+    {name:"慢2", duration_min:1.5, cadence:150, cue:"放松一分半", pre_cue:"还有十秒，准备加速", pre_cue_lead:10},
+    {name:"快3", duration_min:2, cadence:175, cue:"最后一组加速，步频一百七十五", pre_cue:"还有十秒，准备放松", pre_cue_lead:10},
+    {name:"慢3", duration_min:1.5, cadence:150, cue:"放松一分半", pre_cue:"还有十五秒，进入冷身", pre_cue_lead:15},
+    {name:"冷身", duration_min:3, cadence:145, cue:"冷身开始，放慢脚步，步频一百四十五", pre_cue:"训练即将结束，很棒", pre_cue_lead:15}
+  ]},
+  fatburn: { level:"进阶", name:"HIIT 减脂间歇跑", desc:"科学燃脂 HIIT：热身→4组『冲刺30秒(步频180)↔慢跑恢复60秒(步频150)』→冷身。冲刺:恢复=1:2，强度高、后燃效应强，适合有基础的跑者。", phases:[
+    {name:"热身", duration_min:3, cadence:140, cue:"热身开始，轻松慢跑三分钟，步频一百四十，活动开身体", pre_cue:"还有十五秒，准备第一次冲刺", pre_cue_lead:15},
+    {name:"冲刺1", duration_min:0.5, cadence:180, cue:"冲刺三十秒，步频一百八十，全力以赴", pre_cue:"还有五秒，准备放松慢跑", pre_cue_lead:5},
+    {name:"恢复1", duration_min:1, cadence:150, cue:"恢复慢跑一分钟，步频降到一百五十，调整呼吸", pre_cue:"还有五秒，准备第二次冲刺", pre_cue_lead:5},
+    {name:"冲刺2", duration_min:0.5, cadence:180, cue:"第二次冲刺，步频一百八十，坚持", pre_cue:"还有五秒，准备放松", pre_cue_lead:5},
+    {name:"恢复2", duration_min:1, cadence:150, cue:"恢复慢跑一分钟", pre_cue:"还有五秒，准备第三次冲刺", pre_cue_lead:5},
+    {name:"冲刺3", duration_min:0.5, cadence:180, cue:"第三次冲刺，最后发力", pre_cue:"还有五秒，准备放松", pre_cue_lead:5},
+    {name:"恢复3", duration_min:1, cadence:150, cue:"恢复慢跑一分钟", pre_cue:"还有五秒，最后一次冲刺", pre_cue_lead:5},
+    {name:"冲刺4", duration_min:0.5, cadence:182, cue:"最后一次冲刺，步频一百八十二，拼尽全力", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"冷身", duration_min:3, cadence:140, cue:"冷身开始，放慢脚步，步频一百四十，让心率慢慢降下来", pre_cue:"训练即将结束，今天表现很棒", pre_cue_lead:15}
+  ]},
+  pyramid: { level:"进阶", name:"金字塔间歇跑", desc:"经典金字塔：2→3→4→3→2分钟阶梯递进再递减，强度逐步爬升再回落，全面提升有氧与无氧能力。", phases:[
+    {name:"热身", duration_min:3, cadence:145, cue:"热身开始，轻松慢跑三分钟", pre_cue:"还有十秒，进入第一层", pre_cue_lead:10},
+    {name:"2分钟", duration_min:2, cadence:165, cue:"两分钟间歇，步频一百六十五", pre_cue:"还有十秒，升到三分钟", pre_cue_lead:10},
+    {name:"3分钟", duration_min:3, cadence:170, cue:"三分钟间歇，步频一百七十", pre_cue:"还有十秒，升到四分钟", pre_cue_lead:10},
+    {name:"4分钟", duration_min:4, cadence:175, cue:"四分钟间歇，步频一百七十五，最强一段", pre_cue:"还有十秒，开始回落", pre_cue_lead:10},
+    {name:"3分钟回落", duration_min:3, cadence:170, cue:"回落三分钟，步频一百七十", pre_cue:"还有十秒，回到两分钟", pre_cue_lead:10},
+    {name:"2分钟收尾", duration_min:2, cadence:165, cue:"最后两分钟，步频一百六十五", pre_cue:"还有十秒，进入冷身", pre_cue_lead:10},
+    {name:"冷身", duration_min:3, cadence:145, cue:"冷身开始，放慢脚步", pre_cue:"训练即将结束，很棒", pre_cue_lead:15}
+  ]},
+  tempo: { level:"专业", name:"乳酸阈值跑 Tempo", desc:"专业门槛训练：持续20分钟『舒适但难受』的阈值配速（步频172），提升乳酸清除能力，是半马/全马成绩的关键课。", phases:[
+    {name:"热身", duration_min:8, cadence:150, cue:"热身八分钟，轻松慢跑，步频一百五十", pre_cue:"还有十五秒，进入阈值跑", pre_cue_lead:15},
+    {name:"阈值跑", duration_min:20, cadence:172, cue:"阈值跑开始，步频一百七十二，保持在能说短句的强度", pre_cue:"还有十五秒，准备冷身", pre_cue_lead:15},
+    {name:"冷身", duration_min:8, cadence:150, cue:"冷身八分钟，放慢脚步，步频一百五十", pre_cue:"训练即将结束，很棒", pre_cue_lead:15}
+  ]},
+  lsd: { level:"专业", name:"LSD 长距离慢跑", desc:"长距离有氧基础课：40分钟低强度匀速跑，强化脂肪供能与毛细血管密度，是半马/全马跑者的周末长课。", phases:[
+    {name:"热身", duration_min:5, cadence:145, cue:"热身五分钟，轻松慢跑", pre_cue:"还有十五秒，进入长跑", pre_cue_lead:15},
+    {name:"长距离跑", duration_min:40, cadence:160, cue:"长距离慢跑开始，步频一百六十，保持轻松能聊天", pre_cue:"还有十五秒，准备冷身", pre_cue_lead:15},
+    {name:"冷身", duration_min:5, cadence:145, cue:"冷身五分钟，放慢脚步", pre_cue:"训练即将结束，耐力又进一步", pre_cue_lead:15}
+  ]},
+  vo2max: { level:"大神", name:"VO2max 高强度间歇", desc:"亚索800式顶级强度课：5组『快跑60秒(步频180)↔慢跑恢复90秒』，把最大摄氧量逼到极限，适合备战5K/10K的比赛型跑者，每周最多一次。", phases:[
+    {name:"热身", duration_min:5, cadence:150, cue:"热身五分钟，步频一百五十，充分活动", pre_cue:"还有十秒，第一次快跑", pre_cue_lead:10},
+    {name:"快跑1", duration_min:1, cadence:180, cue:"快跑一分钟，步频一百八十，接近极限", pre_cue:"还有五秒，慢跑恢复", pre_cue_lead:5},
+    {name:"恢复1", duration_min:1.5, cadence:150, cue:"慢跑恢复一分半，步频一百五十", pre_cue:"还有五秒，第二次快跑", pre_cue_lead:5},
+    {name:"快跑2", duration_min:1, cadence:180, cue:"第二次快跑", pre_cue:"还有五秒，慢跑恢复", pre_cue_lead:5},
+    {name:"恢复2", duration_min:1.5, cadence:150, cue:"慢跑恢复一分半", pre_cue:"还有五秒，第三次快跑", pre_cue_lead:5},
+    {name:"快跑3", duration_min:1, cadence:182, cue:"第三次快跑，步频一百八十二", pre_cue:"还有五秒，慢跑恢复", pre_cue_lead:5},
+    {name:"恢复3", duration_min:1.5, cadence:150, cue:"慢跑恢复一分半", pre_cue:"还有五秒，第四次快跑", pre_cue_lead:5},
+    {name:"快跑4", duration_min:1, cadence:182, cue:"第四次快跑", pre_cue:"还有五秒，慢跑恢复", pre_cue_lead:5},
+    {name:"恢复4", duration_min:1.5, cadence:150, cue:"慢跑恢复一分半", pre_cue:"还有五秒，最后一次快跑", pre_cue_lead:5},
+    {name:"快跑5", duration_min:1, cadence:184, cue:"最后一次快跑，步频一百八十四，全力冲刺", pre_cue:"还有五秒，准备冷身", pre_cue_lead:5},
+    {name:"冷身", duration_min:5, cadence:145, cue:"冷身五分钟，放慢脚步，步频一百四十五", pre_cue:"训练即将结束，强度很大，记得拉伸", pre_cue_lead:15}
+  ]}
+};
+
+// ---------- 渲染 ----------
+function copyPhase(i){
+  const src = state.phases[i];
+  const clone = JSON.parse(JSON.stringify(src));
+  clone.uid = uidSeq++;
+  state.phases.splice(i+1, 0, clone);
+  render();
+}
+
+function mkPhaseObj(tpl){
+  return { uid: uidSeq++, name:tpl?.name||"新阶段", duration_min:tpl?.duration_min||2,
+    cadence:tpl?.cadence||160, source:"synth", song_id:null, song_name:"", song_bpm:null,
+    cue:tpl?.cue||"", pre_cue:tpl?.pre_cue||"", pre_cue_lead:tpl?.pre_cue_lead||15 };
+}
+
+function render(){
+  const list = $("phaseList");
+  list.textContent = "";
+  state.phases.forEach((p, i) => {
+    const card = document.createElement("div");
+    card.className = "phase"; card.id = "phase-" + p.uid;
+
+    // 头部
+    const head = document.createElement("div");
+    head.className = "phase-head";
+    const idx = document.createElement("span"); idx.className = "idx"; idx.textContent = "阶段 " + (i+1);
+    const name = document.createElement("input"); name.type="text"; name.value = p.name;
+    name.addEventListener("input", e => { p.name = e.target.value; });
+    head.appendChild(idx); head.appendChild(name);
+    const btns = ["up","down","copy","play","del"].map(k=>{
+      const b = document.createElement("button"); b.className = "btn small";
+      b.textContent = {up:"↑",down:"↓",copy:"⧉ 复制",play:"▶ 试听",del:"✕"}[k];
+      if(k==="del") b.classList.add("danger");
+      b.addEventListener("click", () => {
+        if(k==="up" && i>0){ state.phases.splice(i,1); state.phases.splice(i-1,0,p); render(); }
+        if(k==="down" && i<state.phases.length-1){ state.phases.splice(i,1); state.phases.splice(i+1,0,p); render(); }
+        if(k==="del"){ state.phases.splice(i,1); render(); }
+        if(k==="play") audition(i);
+        if(k==="copy") copyPhase(i);
+      });
+      return b;
+    });
+    btns.forEach(b=>head.appendChild(b));
+    card.appendChild(head);
+
+    // 参数行
+    const rows = document.createElement("div"); rows.className = "phase-rows";
+    const mkNum = (label, val, min, step, oninput) => {
+      const f = document.createElement("div"); f.className = "field";
+      const l = document.createElement("label"); l.textContent = label;
+      const inp = document.createElement("input"); inp.type="number"; inp.min=min; inp.step=step; inp.value=val;
+      inp.addEventListener("input", e=>{ oninput(parseFloat(e.target.value)||0); updateTotal(); });
+      f.appendChild(l); f.appendChild(inp); return f;
+    };
+    // 时长: 分 + 秒 双单位
+    const durF = document.createElement("div"); durF.className = "field";
+    const durL = document.createElement("label"); durL.textContent = "时长";
+    const durRow = document.createElement("div"); durRow.className = "dur-row";
+    const durM = document.createElement("input"); durM.type="number"; durM.min=0; durM.step=1; durM.style.width="64px";
+    durM.value = Math.floor(p.duration_min||0);
+    const durS = document.createElement("input"); durS.type="number"; durS.min=0; durS.max=59; durS.step=5; durS.style.width="58px";
+    durS.value = Math.round((p.duration_min - Math.floor(p.duration_min||0)) * 60) || 0;
+    const durSync = ()=>{ const mins = Math.max(0, parseInt(durM.value)||0); const secs = Math.max(0, parseInt(durS.value)||0); p.duration_min = Math.max(0.2, mins + secs/60); };
+    durM.addEventListener("input", ()=>{ durSync(); updateTotal(); });
+    durS.addEventListener("input", ()=>{ durSync(); updateTotal(); });
+    const mU = document.createElement("span"); mU.className = "dur-unit"; mU.textContent = "分";
+    const sU = document.createElement("span"); sU.className = "dur-unit"; sU.textContent = "秒";
+    durRow.appendChild(durM); durRow.appendChild(mU); durRow.appendChild(durS); durRow.appendChild(sU);
+    durF.appendChild(durL); durF.appendChild(durRow); rows.appendChild(durF);
+    rows.appendChild(mkNum("目标步频（步/分）", p.cadence, 110, 1, v=>{ p.cadence = v; const s=card.querySelector(".bpm-show"); if(s) s.textContent = "音乐BPM ≈ " + bpmOf(p); }));
+    const bpmF = document.createElement("div"); bpmF.className = "field";
+    const bpmL = document.createElement("label"); bpmL.textContent = "音乐BPM（自动）";
+    const bpmS = document.createElement("div"); bpmS.className = "bpm-show"; bpmS.style.fontSize="15px"; bpmS.style.color="var(--accent-dark)"; bpmS.textContent = "≈ " + bpmOf(p);
+    bpmF.appendChild(bpmL); bpmF.appendChild(bpmS); rows.appendChild(bpmF);
+
+    // 音乐来源: v1.8 起背景音乐为全局统一(见上方"背景音乐"卡片), 阶段不再单独选歌
+    const srcF = document.createElement("div"); srcF.className = "field";
+    const srcL = document.createElement("label"); srcL.textContent = "背景音乐";
+    const srcH = document.createElement("div"); srcH.className = "hint"; srcH.style.margin = "0";
+    srcH.textContent = "跟随全局风格/歌曲（见上方背景音乐卡片）";
+    srcF.appendChild(srcL); srcF.appendChild(srcH); rows.appendChild(srcF);
+    card.appendChild(rows);
+
+    // 语音提示
+    const cueRow = document.createElement("div"); cueRow.className = "cue-row";
+    const mkCue = (label, val, phKey) => {
+      const f = document.createElement("div"); f.className = "field";
+      const l = document.createElement("label"); l.textContent = label;
+      const t = document.createElement("textarea"); t.value = val || "";
+      t.placeholder = "留空则无提示";
+      t.addEventListener("input", e=>{ p[phKey] = e.target.value; });
+      f.appendChild(l); f.appendChild(t); return f;
+    };
+    cueRow.appendChild(mkCue("阶段开始提示语", p.cue, "cue"));
+    const preF = mkCue("阶段结束前提前提醒（保留！）", p.pre_cue, "pre_cue");
+    const leadF = document.createElement("div"); leadF.className = "field";
+    const leadL = document.createElement("label"); leadL.textContent = "提前提醒播放时刻（结束前N秒）";
+    const lead = document.createElement("input"); lead.type="number"; lead.min=3; lead.value = p.pre_cue_lead;
+    lead.addEventListener("input", e=>{ p.pre_cue_lead = parseFloat(e.target.value)||15; });
+    leadF.appendChild(leadL); leadF.appendChild(lead);
+    preF.appendChild(leadF); cueRow.appendChild(preF);
+    card.appendChild(cueRow);
+
+    // 单阶段试听(内嵌本卡, 带合成中 loading)
+    const loader = document.createElement("div"); loader.className = "phase-loading";
+    loader.innerHTML = '<span class="spinner"></span><span>正在合成试听音频…</span>';
+    card.appendChild(loader);
+    const av = document.createElement("audio");
+    av.controls = true; av.style.width = "100%"; av.style.marginTop = "10px";
+    av.className = "phase-audio"; av.dataset.uid = p.uid;
+
+    card.appendChild(av);
+
+    list.appendChild(card);
+  });
+  updateTotal();
+  scheduleSave();
+  renderPhaseNav();
+  updateNavCurrent();
+}
+
+// ---------- 侧边阶段全览导航 ----------
+function renderPhaseNav(){
+  const nav = $("phaseNav"); if(!nav) return;
+  nav.textContent = "";
+  state.phases.forEach((p, i) => {
+    const b = document.createElement("button"); b.className = "nav-it"; b.textContent = i + 1;
+    b.dataset.uid = p.uid;
+    const tip = document.createElement("span"); tip.className = "tip";
+    tip.textContent = (i + 1) + ". " + (p.name || ("阶段" + (i + 1)));
+    b.appendChild(tip);
+    b.addEventListener("click", ()=>{
+      const el = document.getElementById("phase-" + p.uid);
+      if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+    });
+    nav.appendChild(b);
+  });
+}
+function updateNavCurrent(){
+  const nav = $("phaseNav"); if(!nav) return;
+  const items = nav.querySelectorAll(".nav-it");
+  const cards = state.phases.map(p => document.getElementById("phase-" + p.uid)).filter(Boolean);
+  if(!cards.length) return;
+  const mid = window.scrollY + window.innerHeight * 0.3;
+  let cur = 0;
+  for(let i = 0; i < cards.length; i++){
+    if(cards[i].offsetTop <= mid) cur = i;
+  }
+  items.forEach((b, i) => b.classList.toggle("on", i === cur));
+}
+window.addEventListener("scroll", updateNavCurrent, {passive:true});
+
+// ---------- 歌曲上传 ----------
+async function uploadSong(file){
+  if(!file) return;
+  setStatus("info","正在上传歌曲并检测 BPM…");
+  try{
+    const buf = await file.arrayBuffer();
+    const resp = await fetch("/api/song/upload", {
+      method:"POST",
+      headers: { "Content-Type":"application/octet-stream", "X-Filename": encodeURIComponent(file.name) },
+      body: buf
+    });
+    const j = await resp.json();
+    if(j.error) throw new Error(j.error);
+    state.globalSong = { song_id: j.song_id, song_name: j.name, song_bpm: j.bpm };
+    $("songName").textContent = j.name + (j.bpm ? `（BPM ${j.bpm}）` : "（BPM 检测失败，导出时自动检测）");
+    $("songClear").style.display = "inline-block";
+    setStatus("ok", "全局歌曲已上传：" + j.name);
+    scheduleSave();
+  }catch(e){
+    setStatus("err","上传失败：" + e.message);
+  }
+}
+
+// ---------- 全局试听互斥 ----------
+// 所有试听(阶段卡/背景音乐风格/完整音频)互斥: 播放新的一个时, 自动停止并复位其他试听
+document.addEventListener("play", (e)=>{
+  const src = e.target;
+  if(!(src instanceof HTMLAudioElement)) return;
+  document.querySelectorAll("audio").forEach(o=>{
+    if(o !== src && !o.paused){ o.pause(); o.currentTime = 0; }
+  });
+}, true);
+
+// ---------- 试听 ----------
+
+async function audition(idx){
+  const p = state.phases[idx];
+  const a = document.querySelector(`.phase-audio[data-uid="${p.uid}"]`);
+  const card = a ? a.closest(".phase") : null;
+  const loader = card ? card.querySelector(".phase-loading") : null;
+  if(loader) loader.style.display = "flex";
+  if(a){ a.pause(); a.removeAttribute("src"); a.load(); }
+  showBar(true); setStatus("info","正在合成试听音频…");
+  try{
+    const plan = buildPlan() || {};
+    plan._ts = Date.now();   // 强制用当前最新参数重新合成
+    const resp = await fetch("/api/preview", { method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify({ plan, phase_index: idx, preview_sec: "full", seed: parseInt($("seed").value)||7 })});
+    const j = await resp.json();
+    if(j.error) throw new Error(j.error);
+    if(a){ a.src = j.url; a.load(); a.play().catch(()=>{}); }
+    setStatus("ok", `试听就绪：${p.name}（整段 ${j.duration} 秒，已按最新参数重新合成）`);
+  }catch(e){
+    if(e instanceof TypeError){
+      setStatus("err","无法连接服务。请确认：① 黑色启动窗口保持打开别关闭；② 页面地址是 http://127.0.0.1:8787（不要直接双击 ui.html 打开）；③ 若刚启动请稍等几秒再试");
+    }else{
+      setStatus("err","试听失败：" + e.message);
+    }
+  }
+  showBar(false);
+  if(loader) loader.style.display = "none";
+}
+
+// ---------- 背景音乐风格试听 ----------
+async function auditionStyle(){
+  const style = $("musicStyle").value;
+  const styleName = $("musicStyle").selectedOptions[0]?.textContent || style;
+  setStatus("info", `正在合成「${styleName}」风格试听…`);
+  try{
+    const plan = { title:"风格试听", music_style: style,
+      phases:[{ name:"风格试听", duration_min:0.75, cadence:155, source:"synth" }] };
+    const resp = await fetch("/api/preview", { method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify({ plan, phase_index: 0, preview_sec: "full", seed: parseInt($("seed").value)||7 })});
+    const j = await resp.json();
+    if(j.error) throw new Error(j.error);
+    const a = $("styleAudio"); a.src = j.url; a.load(); a.play().catch(()=>{});
+    setStatus("ok", `「${styleName}」风格试听就绪（45秒，戴耳机注意听和弦走向与音色差异）`);
+  }catch(e){
+    setStatus("err","风格试听失败：" + e.message);
+  }
+}
+
+// ---------- 导出 / 完整试听 ----------
+async function runGenerate(format, mode, bitrate){
+  const plan = buildPlan(true);
+  if(!plan) return null;
+  setStatus("info", mode==="preview" ? "正在合成完整音频试听…" : "已提交导出任务，正在生成…"); showBar(true);
+  try{
+    const resp = await fetch("/api/generate", { method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ plan, format, seed: parseInt($("seed").value)||7, ...(bitrate ? { bitrate } : {}) })});
+    const j = await resp.json();
+    if(j.error) throw new Error(j.error);
+    let job;
+    for(let i=0;i<180;i++){
+      await new Promise(r=>setTimeout(r,1500));
+      const r2 = await fetch("/api/jobs/"+j.job_id);
+      job = await r2.json();
+      $("bar").style.display="block"; $("bar").querySelector("i").style.width = Math.min(90, 10+i*2) + "%";
+      if(job.state==="done" || job.state==="error") break;
+    }
+    showBar(false);
+    if(job.state==="error") throw new Error(job.error || "生成失败");
+    return job;
+  }catch(e){
+    showBar(false);
+    if(e instanceof TypeError){
+      setStatus("err","无法连接服务。请确认：① 黑色启动窗口保持打开别关闭；② 页面地址是 http://127.0.0.1:8787（不要直接双击 ui.html 打开）；③ 若刚启动请稍等几秒再试");
+    }else{
+      setStatus("err", (mode==="preview" ? "试听失败：" : "导出失败：") + e.message);
+    }
+    return null;
+  }
+}
+async function exportAudio(){
+  const job = await runGenerate($("format").value, "export");
+  if(!job) return;
+  const a = $("resultAudio"); a.src = job.url; a.play().catch(()=>{});
+  const dl = $("resultDl"); dl.href = job.url; dl.download = job.url.split("/").pop();
+  $("resultStats").textContent = `时长 ${(job.stats.duration_s/60).toFixed(1)} 分钟（${job.stats.duration_s|0} 秒）· ${job.stats.phases} 个阶段 · ${job.stats.cues} 条语音提示`;
+  $("result").classList.add("show");
+  const warns = (job.stats.warnings||[]);
+  setStatus("ok", "导出完成 ✔ 可直接播放或下载到手机" + (warns.length ? "；注意：" + warns.join("；") : ""));
+  addHistory(job.stats.duration_s, job.url, $("format").value);
+  renderHistory();
+}
+async function previewAll(){
+  const job = await runGenerate("mp3", "preview", "96k");
+  if(!job) return;
+  const a = $("resultAudio"); a.src = job.url; a.play().catch(()=>{});
+  $("resultStats").textContent = `完整音频试听：时长 ${(job.stats.duration_s/60).toFixed(1)} 分钟（${job.stats.duration_s|0} 秒）· ${job.stats.phases} 个阶段 · ${job.stats.cues} 条语音提示`;
+  $("result").classList.add("show");
+  setStatus("ok", `完整音频试听就绪（${(job.stats.duration_s/60).toFixed(1)} 分钟）`);
+  addHistory(job.stats.duration_s, job.url, "mp3");
+  renderHistory();
+}
+
+// ---------- 计划组装 ----------
+function buildPlan(validate){
+  if(!state.phases.length){ if(validate) setStatus("err","请先添加阶段"); return null; }
+  const plan = {
+    title: ($("planTitle").value || "我的跑步计划").trim(),
+    voice: $("voice").value,
+    voice_rate: $("voiceRate").value,
+    tempo_ratio: parseFloat($("tempoRatio").value),
+    duck_db: parseFloat($("duckDb").value),
+    cue_lead_sec: Math.max(0, parseFloat($("cueLead").value)||0.8),
+    crossfade_sec: crossfadeSec(),
+    music_style: $("musicStyle").value,
+    metronome_gain: (parseFloat($("metroGain").value)||18)/100,
+    ...(state.globalSong?.song_id ? { song_id: state.globalSong.song_id, song_bpm: state.globalSong.song_bpm } : {}),
+    phases: state.phases.map(p=>({
+      name: p.name || "阶段",
+      duration_min: Math.max(0.2, p.duration_min||1),
+      cadence: Math.min(230, Math.max(110, p.cadence||160)),
+      source: "synth",
+      ...(p.cue ? { cue: p.cue } : {}),
+      ...(p.pre_cue ? { pre_cue: p.pre_cue, pre_cue_lead: Math.max(3, p.pre_cue_lead||15) } : {})
+    }))
+  };
+  if(validate){
+    for(const ph of plan.phases){
+      if(ph.pre_cue && ph.pre_cue_lead >= ph.duration_min*60-3){ setStatus("err",`阶段「${ph.name}」提前提醒时间需小于阶段时长-3秒`); return null; }
+    }
+  }
+  return plan;
+}
+
+// ---------- 状态 UI ----------
+function setStatus(kind, msg){
+  const s = $("status"); s.className = "status show " + kind; s.textContent = msg;
+}
+function showBar(on){
+  $("bar").classList.toggle("show", on);
+  if(on){ $("bar").querySelector("i").style.width = "6%"; }
+}
+
+// ---------- 历史计划 ----------
+const HIST_KEY = "runbeat_history_v1";
+function loadHistory(){ try{ const raw = localStorage.getItem(HIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; } }
+function saveHistory(list){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(list)); }catch(e){} }
+function addHistory(duration_s, url, fmt){
+  const list = loadHistory();
+  const st = collectState();
+  const now = new Date().toLocaleString("zh-CN", {hour12:false});
+  const dur = Math.round(duration_s||0);
+  const first = list[0];
+  const same = first && first.title === (($("planTitle").value||"").trim()) && first.duration_s === dur && (first.state?.phases||[]).length === st.phases.length;
+  if(same){ first.saved_at = now; first.state = st; if(url){ first.url = url; first.format = fmt||"mp3"; } }
+  else{
+    list.unshift({ id: Date.now() + Math.random().toString(16).slice(2,6),
+      title: ($("planTitle").value || "我的跑步计划").trim(), saved_at: now, duration_s: dur,
+      url: url||"", format: fmt||"mp3", state: st });
+  }
+  if(list.length > 20) list.length = 20;
+  saveHistory(list);
+}
+function renderHistory(){
+  const wrap = $("historyList");
+  if(!wrap) return;
+  const list = loadHistory();
+  wrap.textContent = "";
+  if(!list.length){
+    const d = document.createElement("div"); d.className = "hint";
+    d.textContent = "还没有历史计划——导出一次音频或试听完整音频后，会自动出现在这里。";
+    wrap.appendChild(d); return;
+  }
+  list.forEach((h, i) => {
+    const row = document.createElement("div"); row.className = "history-row";
+    const info = document.createElement("div"); info.className = "history-info";
+    const t = document.createElement("div"); t.className = "history-title";
+    t.textContent = h.title || "未命名计划";
+    const meta = document.createElement("div"); meta.className = "hint";
+    meta.textContent = (h.saved_at||"") + " · 时长 " + fmtMin(h.duration_s) + " · " + (h.state?.phases||[]).length + " 个阶段";
+    info.appendChild(t); info.appendChild(meta);
+    const au = document.createElement("audio");
+    if(h.url){ au.src = h.url; au.controls = true; au.style.cssText = "width:100%;height:34px;display:none;margin-top:6px"; }
+    info.appendChild(au);
+    const ops = document.createElement("div"); ops.className = "history-ops";
+    const mkOp = (txt, fn) => { const b = document.createElement("button"); b.className = "btn small"; b.textContent = txt; b.addEventListener("click", fn); return b; };
+    ops.appendChild(mkOp("▶ 播放", ()=>{
+      if(!h.url){ setStatus("err","该记录未保存音频文件，重新导出一次后即可播放/下载"); return; }
+      if(au.style.display === "none"){ au.style.display = "block"; au.play().catch(()=>{}); }
+      else{ au.pause(); au.style.display = "none"; }
+    }));
+    ops.appendChild(mkOp("⭳ 下载", ()=>{
+      if(!h.url){ setStatus("err","该记录未保存音频文件，重新导出一次后即可下载"); return; }
+      const a = document.createElement("a"); a.href = h.url;
+      a.download = decodeURIComponent(h.url.split("/").pop());
+      document.body.appendChild(a); a.click(); a.remove();
+      setStatus("ok", "已开始下载音频（" + (h.title||"未命名") + "）");
+    }));
+    ops.appendChild(mkOp("⧉ 复制并编辑", ()=>{
+      if(h.state && applyState(JSON.parse(JSON.stringify(h.state)))){ $("planTitle").value = (h.title||"我的跑步计划") + "（副本）"; render(); setStatus("ok","已复制历史计划到编辑器，可自由修改"); }
+    }));
+    ops.appendChild(mkOp("✎ 载入编辑", ()=>{
+      if(h.state && applyState(JSON.parse(JSON.stringify(h.state)))){ render(); setStatus("ok","已载入历史计划，可继续编辑"); }
+    }));
+    ops.appendChild(mkOp("🗑 删除", ()=>{
+      if(confirm("删除历史计划「" + (h.title||"未命名") + "」？")){ const l = loadHistory(); l.splice(i,1); saveHistory(l); renderHistory(); }
+    }));
+    row.appendChild(info); row.appendChild(ops);
+    wrap.appendChild(row);
+  });
+}
+
+// ---------- 计划保存/载入/导出 ----------
+const LS_KEY = "runbeat_plan_v1";
+function collectState(){
+  return { title: $("planTitle").value, voice: $("voice").value, voice_rate: $("voiceRate").value,
+    tempo_ratio: $("tempoRatio").value, duck_db: $("duckDb").value, seed: $("seed").value,
+    crossfade: $("crossfade").value, cueLead: $("cueLead").value, metroGain: $("metroGain").value,
+    music_style: $("musicStyle").value, globalSong: state.globalSong,
+    phases: state.phases.map(p=>({ name:p.name, duration_min:p.duration_min, cadence:p.cadence,
+      source:"synth", cue:p.cue, pre_cue:p.pre_cue, pre_cue_lead:p.pre_cue_lead })) };
+}
+function applyState(s){
+  if(!s || !Array.isArray(s.phases)) return false;
+  $("planTitle").value = s.title||"我的跑步计划";
+  if(s.voice) $("voice").value = s.voice;
+  if(s.voice_rate) $("voiceRate").value = s.voice_rate;
+  if(s.tempo_ratio) $("tempoRatio").value = s.tempo_ratio;
+  if(s.duck_db) $("duckDb").value = s.duck_db;
+  if(s.seed) $("seed").value = s.seed;
+  if(s.crossfade) $("crossfade").value = s.crossfade;
+  if(s.cueLead) $("cueLead").value = s.cueLead;
+  if(s.metroGain) $("metroGain").value = s.metroGain;
+  if(s.music_style) $("musicStyle").value = s.music_style;
+  if(s.globalSong && s.globalSong.song_id){ state.globalSong = s.globalSong;
+    $("songName").textContent = s.globalSong.song_name + (s.globalSong.song_bpm ? `（BPM ${s.globalSong.song_bpm}）` : "");
+    $("songClear").style.display = "inline-block"; }
+  state.phases = s.phases.map(p=>({ uid:uidSeq++, name:p.name||"阶段", duration_min:p.duration_min||2,
+    cadence:p.cadence||160, source:"synth", cue:p.cue||"", pre_cue:p.pre_cue||"",
+    pre_cue_lead:p.pre_cue_lead||15 }));
+  return true;
+}
+let saveTimer = null;
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(collectState())); }catch(e){} }, 600);
+}
+function exportPlanFile(){
+  const plan = buildPlan(false);
+  if(!plan) return;
+  const blob = new Blob([JSON.stringify(plan, null, 2)], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = (plan.title||"runbeat_plan") + ".json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+}
+function importPlanFile(file){
+  if(!file) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const d = JSON.parse(rd.result);
+      if(!d || !Array.isArray(d.phases)) throw new Error("不是有效的 RunBeat 计划文件");
+      applyState({
+        title: d.title, voice: d.voice, voice_rate: d.voice_rate,
+        tempo_ratio: d.tempo_ratio!=null ? String(d.tempo_ratio) : undefined,
+        duck_db: d.duck_db!=null ? String(d.duck_db) : undefined,
+        crossfade: d.crossfade_sec!=null ? String(d.crossfade_sec) : undefined,
+        cueLead: d.cue_lead_sec!=null ? String(d.cue_lead_sec) : undefined,
+        music_style: d.music_style, globalSong: d.song_id ? { song_id: d.song_id, song_name: d.song_name||"", song_bpm: d.song_bpm||null } : undefined,
+        phases: d.phases
+      });
+      render(); setStatus("ok", `已导入计划「${d.title||"未命名"}」`);
+    }catch(e){ setStatus("err","导入失败：" + e.message); }
+  };
+  rd.readAsText(file);
+}
+
+// ---------- 手机访问横幅 ----------
+async function showLan(){
+  try{
+    const r = await fetch("/api/info");
+    const j = await r.json();
+    if(j.lan && j.lan.length){
+      const link = j.lan[0];
+      $("lanCard").style.display = "";
+      const a = $("lanLink"); a.href = link; a.textContent = link;
+      $("qrImg").src = "/api/qr?text=" + encodeURIComponent(link);
+    }
+  }catch(e){ /* 局域网地址获取失败不影响主功能 */ }
+}
+
+// ---------- 事件 ----------
+// addPhase/clearAll 由 renderTplButtons() 动态生成并绑定
+$("exportBtn").addEventListener("click", exportAudio);
+$("previewAllBtn").addEventListener("click", previewAll);
+$("styleAudBtn").addEventListener("click", auditionStyle);
+$("savePlan").addEventListener("click", ()=>{
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(collectState())); setStatus("ok","计划已保存到本浏览器"); }
+  catch(e){ setStatus("err","保存失败（浏览器存储不可用）"); }
+});
+$("exportPlan").addEventListener("click", exportPlanFile);
+$("importPlan").addEventListener("click", ()=>$("importFile").click());
+$("importFile").addEventListener("change", e=>{ importPlanFile(e.target.files[0]); e.target.value=""; });
+$("copyLan").addEventListener("click", ()=>{
+  const t = $("lanLink").textContent;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(()=>setStatus("ok","局域网地址已复制"));
+  } else { window.prompt("复制地址:", t); }
+});
+// 模板按钮动态渲染(含 hover 课程介绍)
+function renderTplButtons(){
+  const row = $("tplRow");
+  row.textContent = "";
+  Object.keys(TPL).forEach(key => {
+    const tpl = TPL[key];
+    const wrap = document.createElement("div"); wrap.className = "tpl-item";
+    const btn = document.createElement("button"); btn.className = "btn tpl"; btn.textContent = tpl.name;
+    btn.addEventListener("click", ()=>{
+      state.phases = tpl.phases.map(t=>mkPhaseObj(t));
+      render();
+      setStatus("ok", `已载入「${tpl.name}」模板（${tpl.level}级），可自由修改`);
+    });
+    wrap.appendChild(btn);
+    const pop = document.createElement("div"); pop.className = "tpl-pop";
+    const h = document.createElement("div"); h.style.fontWeight = "600"; h.style.fontSize = "14px";
+    h.textContent = tpl.name;
+    const lv = document.createElement("span"); lv.className = "lv lv-" + tpl.level; lv.textContent = tpl.level + "级";
+    h.appendChild(lv); pop.appendChild(h);
+    let totMin = 0; tpl.phases.forEach(ph => { totMin += ph.duration_min||0; });
+    const tm = document.createElement("div"); tm.style.marginTop = "6px"; tm.style.fontWeight = "600"; tm.style.color = "var(--accent-dark,#1f6f52)";
+    const tmm = Math.floor(totMin); const tss = Math.round((totMin - tmm) * 60);
+    tm.textContent = "总时长 " + (tss ? (tmm + "分" + tss + "秒") : (tmm + "分钟")) + " · " + tpl.phases.length + " 个阶段";
+    const d = document.createElement("div"); d.style.marginTop = "4px"; d.textContent = tpl.desc;
+    pop.appendChild(d);
+    pop.insertBefore(tm, d);
+    const tb = document.createElement("table");
+    tpl.phases.forEach((ph, i)=>{
+      const mm = Math.floor(ph.duration_min||0); const ss = Math.round((ph.duration_min - mm) * 60);
+      const ds = ss ? (mm + "分" + ss + "秒") : (mm + "分钟");
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td"); td1.textContent = "阶段" + (i+1) + " " + (ph.name||"");
+      const td2 = document.createElement("td"); td2.textContent = ds + " · 步频" + (ph.cadence||160) + " · 音乐BPM≈" + Math.round((ph.cadence||160) * (parseFloat($("tempoRatio").value)||0.5));
+      tr.appendChild(td1); tr.appendChild(td2); tb.appendChild(tr);
+    });
+    pop.appendChild(tb);
+    wrap.appendChild(pop);
+    row.appendChild(wrap);
+  });
+  const addB = document.createElement("button"); addB.className = "btn"; addB.id = "addPhase"; addB.textContent = "＋ 添加阶段";
+  addB.addEventListener("click", ()=>{ state.phases.push(mkPhaseObj()); render(); });
+  row.appendChild(addB);
+  const clearB = document.createElement("button"); clearB.className = "btn danger"; clearB.id = "clearAll"; clearB.textContent = "清空";
+  clearB.addEventListener("click", ()=>{ if(confirm("清空全部阶段？")){ state.phases=[]; render(); } });
+  row.appendChild(clearB);
+}
+
+renderTplButtons();
+$("tempoRatio").addEventListener("change", render);
+$("musicStyle").addEventListener("change", ()=>{ scheduleSave(); });
+$("songBtn").addEventListener("click", ()=>$("songFile").click());
+$("songFile").addEventListener("change", e=>{ uploadSong(e.target.files[0]); e.target.value=""; });
+$("songClear").addEventListener("click", ()=>{
+  state.globalSong = { song_id:null, song_name:"", song_bpm:null };
+  $("songName").textContent = "未选歌曲（仅用内置风格）";
+  $("songClear").style.display = "none";
+  scheduleSave();
+});
+document.addEventListener("input", ()=>scheduleSave(), true);
+document.addEventListener("change", ()=>scheduleSave(), true);
+
+// ---------- 初始化 ----------
+(async function init(){
+  // 检测是否被直接双击打开（file:// 方式），给出醒目提示
+  if(location.protocol === "file:"){
+    const box = document.createElement("div");
+    box.style.cssText = "background:#fdecea;border:2px solid #d33;color:#a11;padding:14px 16px;border-radius:10px;margin:0 0 14px;font-size:14px;line-height:1.7";
+    box.textContent = "❌ 现在是用「双击 ui.html」的方式打开的，这样无法连接服务。\n请关闭本页，双击「启动-Windows.bat」（或 Mac 的 启动-mac.command），在浏览器自动打开的 http://127.0.0.1:8787 里操作。";
+    box.style.whiteSpace = "pre-line";
+    document.querySelector(".wrap").prepend(box);
+  }
+  try{
+    const r = await fetch("/api/voices");
+    const j = await r.json();
+    state.voices = j.voices || [];
+    const sel = $("voice");
+    sel.textContent = "";
+    state.voices.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=v; sel.appendChild(o); });
+    sel.value = state.voices.includes("zh-CN-YunxiNeural") ? "zh-CN-YunxiNeural" : (state.voices[0]||"");
+  }catch(e){ console.warn("音色加载失败", e); }
+  let restored = false;
+  try{ const saved = localStorage.getItem(LS_KEY); if(saved) restored = applyState(JSON.parse(saved)); }catch(e){}
+  if(!restored){ state.phases = TPL.fatburn.map(t=>mkPhaseObj(t)); }
+  render();
+  renderHistory();
+  showLan();
+  setStatus("ok", restored ? "已自动恢复上次保存的计划" : "已载入「减脂间歇跑」模板，可自由修改");
+})();
+</script>
+</body>
+</html>
