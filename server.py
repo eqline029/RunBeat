@@ -95,6 +95,20 @@ def _validate_job_plan(plan: dict):
             sid = p.get("song_id")
             if not sid or sid not in SONG_REGISTRY:
                 raise ValueError(f"阶段[{p.get('name')}] 的歌曲不存在，请重新上传")
+            _check_song_ready(sid, p.get("name"))
+    gsid = plan.get("song_id")
+    if gsid:
+        if gsid not in SONG_REGISTRY:
+            raise ValueError("背景歌曲不存在，请重新上传")
+        _check_song_ready(gsid, "背景音乐")
+
+
+def _check_song_ready(sid: str, label: str):
+    """歌曲 BPM 分析失败/未完成时给出明确中文错误(而非内部错误透传)"""
+    rec = SONG_REGISTRY.get(sid) or {}
+    if rec.get("status") == "error" or not rec.get("bpm"):
+        name = rec.get("name") or sid
+        raise ValueError(f"「{name}」BPM 分析失败，请删除后重新上传该歌曲")
 
 
 def _run_generate_job(job_id: str, plan: dict, fmt: str, seed: int, bitrate: str = "192k"):
@@ -411,6 +425,21 @@ class Handler(BaseHTTPRequestHandler):
                     if not sid or sid not in SONG_REGISTRY:
                         self._json({"error": f"阶段[{p.get('name')}] 的歌曲不存在"}, 400)
                         return
+                    try:
+                        _check_song_ready(sid, p.get("name"))
+                    except ValueError as e:
+                        self._json({"error": str(e)}, 400)
+                        return
+            gsid = plan.get("song_id")
+            if gsid:
+                if gsid not in SONG_REGISTRY:
+                    self._json({"error": "背景歌曲不存在，请重新上传"}, 400)
+                    return
+                try:
+                    _check_song_ready(gsid, "背景音乐")
+                except ValueError as e:
+                    self._json({"error": str(e)}, 400)
+                    return
             try:
                 seed = int(body.get("seed", 7))
             except (TypeError, ValueError):

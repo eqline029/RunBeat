@@ -7,13 +7,38 @@ RunBeat BPM 对齐模块 —— 把你的歌变速不变调对齐到目标步频
 """
 import os
 import subprocess
+import tempfile
 import numpy as np
 
 
-def detect_bpm(path: str) -> float:
-    """检测音频文件的全局 BPM"""
+def _librosa_load_safe(path: str, sr: int):
+    """
+    安全加载音频: 部分 mp3 的 ID3v2 标签含 UTF-16 文本帧,
+    libsndfile 解析会抛 "Unspecified internal error"(如《七里香》),
+    此时用 ffmpeg 兜底解码为 wav 再加载(ffmpeg 能正常读取该文件)。
+    """
     import librosa
-    y, sr = librosa.load(path, sr=22050, mono=True)
+    try:
+        return librosa.load(path, sr=sr, mono=True)
+    except Exception:
+        fd, tmp = tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
+        try:
+            cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", path,
+                   "-ac", "1", "-ar", str(sr), tmp]
+            r = subprocess.run(cmd, capture_output=True)
+            if r.returncode != 0:
+                raise RuntimeError(f"音频解码失败(ffmpeg): {r.stderr.decode(errors='ignore')[:200]}")
+            return librosa.load(tmp, sr=sr, mono=True)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+
+
+def detect_bpm(path: str) -> float:
+    """检测音频文件的全局 BPM (librosa 读不动时自动 ffmpeg 兜底)"""
+    import librosa
+    y, sr = _librosa_load_safe(path, 22050)
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     bpm = float(np.atleast_1d(tempo)[0])
     return bpm
@@ -25,7 +50,7 @@ def detect_bpm(path: str) -> float:
 def detect_beats(path: str, sr: int = 44100):
     """返回 (audio, sample_rate, source_bpm, beat_times秒)。无清晰律动时 beats 数量会很少"""
     import librosa
-    y, sr = librosa.load(path, sr=sr, mono=True)
+    y, sr = _librosa_load_safe(path, sr)
     tempo, bf = librosa.beat.beat_track(y=y, sr=sr)
     beats = librosa.frames_to_time(bf, sr=sr)
     return y, sr, float(np.atleast_1d(tempo)[0]), beats
