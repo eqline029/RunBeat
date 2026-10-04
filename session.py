@@ -85,18 +85,33 @@ def _load_wav_mono(path: str, sr: int = SR) -> np.ndarray:
 
 def _fit_to_duration(x: np.ndarray, dur_s: float, sr: int = SR,
                      loop_xfade: float = 0.8) -> np.ndarray:
-    """把音频填充/裁剪到指定时长; 短了循环+交叉淡化, 长了淡出裁剪"""
+    """把音频填充/裁剪到指定时长。
+    - 歌比阶段长: 裁剪(不做末尾淡出, 由阶段拼接的3ms去咔哒统一防爆音, 保证刚性衔接)
+    - 歌比阶段短: 循环填充。
+      loop_xfade<=0 -> 刚性循环: 歌曲(已对齐节拍网格)尾部边界直接接到头部起点,
+        仅3ms去咔哒, 节拍零断崖(用于变速/智能对齐模式, 歌内每拍都在目标网格上);
+      loop_xfade>0  -> 交叉淡化循环: 歌曲未对齐网格(原速背景), 用交叉淡化平滑接缝。
+    """
     target = int(dur_s * sr)
     if len(x) >= target:
         out = x[:target].copy()
-        fade = int(0.05 * sr)
-        if fade > 0:
-            out[-fade:] *= np.linspace(1.0, 0.0, fade)
+        return out
+    if loop_xfade <= 0:
+        # 刚性循环: 尾部边界 -> 头部起点 直接拼接, 仅3ms去咔哒消除数字咔哒声
+        declick = min(int(0.003 * sr), 2048)
+        dc = np.linspace(0.0, 1.0, declick, dtype=np.float32) if declick > 0 else None
+        out = x.copy()
+        while len(out) < target:
+            nxt = x.copy()
+            if dc is not None:
+                out[-declick:] *= dc[::-1]
+                nxt[:declick] *= dc
+            out = np.concatenate([out, nxt])
+        out = out[:target]
         return out
     cf = int(loop_xfade * sr)
     if cf >= len(x):
         cf = len(x) // 2
-    piece = x[:cf].copy()  # 用于接缝交叉的片段
     out = x.copy()
     while len(out) < target:
         nxt = x.copy()
@@ -107,9 +122,6 @@ def _fit_to_duration(x: np.ndarray, dur_s: float, sr: int = SR,
         else:
             out = np.concatenate([out, nxt])
     out = out[:target]
-    fade = int(0.05 * sr)
-    if fade > 0:
-        out[-fade:] *= np.linspace(1.0, 0.0, fade)
     return out
 
 
@@ -189,12 +201,19 @@ def render_song_phase(phase: dict, song_path: str, song_bpm: float,
             warning = f"歌曲「{os.path.basename(song_path)}」已做八度校正: 检测 {info['source_bpm']} → 按 {info['bpm_used']} 对齐"
         x = _load_wav_mono(aligned, sr)
     dur_s = float(phase["duration_min"]) * 60.0
-    out = _fit_to_duration(x, dur_s, sr)
-    if metronome_gain > 0:
-        ticks = _metronome_ticks(len(out), target_bpm, metronome_gain, sr)
-        out = out + ticks
+    # 对齐模式(smart/stretch)歌曲每拍都在目标网格上 -> 刚性循环(节拍零断崖);
+    # 原速背景(original)未对齐网格 -> 交叉淡化平滑接缝
+    loop_xfade = 0.0 if mode != "original" else 0.8
+    out = _fit_to_duration(x, dur_s, sr, loop_xfade=loop_xfade)
+    # 节拍器作为独立层: 歌曲先归一化, 再按绝对增益叠加(调整立竿见影, 不再被归一化稀释)
     peak = np.max(np.abs(out)) or 1.0
     out = out * (0.85 / peak)
+    if metronome_gain > 0:
+        ticks = _metronome_ticks(len(out), target_bpm, 0.5 * metronome_gain, sr)
+        out = out + ticks
+    peak = np.max(np.abs(out)) or 1.0
+    if peak > 1.0:
+        out = out * (1.0 / peak)
     return out.astype(np.float32), warning
 
 

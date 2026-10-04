@@ -408,6 +408,7 @@ def render_phase(phase: dict, sr: int = SR, seed: int = 0, tempo_ratio: float = 
         raise ValueError("阶段时长必须大于 0")
 
     track = np.zeros(n, dtype=np.float32)
+    track_drums = np.zeros(n, dtype=np.float32)  # 节拍引导声部(鼓)独立成层, 归一化后按音量叠加
     # 节拍器音量 -> 鼓组(节拍声部)缩放: 默认18% ≈ 1.0 保持原听感
     drum_scale = 0.6 + 2.2 * max(0.0, min(1.0, float(metronome_gain)))
 
@@ -448,19 +449,19 @@ def render_phase(phase: dict, sr: int = SR, seed: int = 0, tempo_ratio: float = 
 
         # 底鼓 按节奏骨架 (节拍声部: 受 drum_scale 控制)
         for b in gr["kick"]:
-            _add(track, t0 + b * beat, kk,
+            _add(track_drums, t0 + b * beat, kk,
                  (1.0 if b == 0 else 0.95) * style["kick_gain"] * drum_scale, sr)
         # 军鼓 按节奏骨架
         if full and sn is not None:
             for b in gr["snare"]:
-                _add(track, t0 + b * beat, sn, 0.75 * style["snare_gain"] * drum_scale, sr)
+                _add(track_drums, t0 + b * beat, sn, 0.75 * style["snare_gain"] * drum_scale, sr)
         # 踩镲 8分音符 = 步点 (所有风格统一, 保证"每一步一帽"的步频引导)
         for e in range(8):
             g = hat_pat[e] if e % 2 == 0 else hat_pat[e] * 0.6
-            _add(track, t0 + e * beat / 2, hat_c, g * style["hat_gain"] * drum_scale, sr)
+            _add(track_drums, t0 + e * beat / 2, hat_c, g * style["hat_gain"] * drum_scale, sr)
         # open hat 在反拍(第5个8分)
         if full and hat_o is not None:
-            _add(track, t0 + 5 * beat / 2, hat_o, 0.30 * style["hat_gain"] * drum_scale, sr)
+            _add(track_drums, t0 + 5 * beat / 2, hat_o, 0.30 * style["hat_gain"] * drum_scale, sr)
 
         if not full:
             continue
@@ -509,10 +510,19 @@ def render_phase(phase: dict, sr: int = SR, seed: int = 0, tempo_ratio: float = 
                 _add(track, t0 + e * beat / 2, pluck(f, decay=ad, bright=ab),
                      0.12 * style["arp_gain"], sr)
 
-    # 母带: 软削波 + 归一
+    # 母带: 音乐层(贝斯/pad/琶音)软削波+归一, 鼓层(节拍声部)归一化后按 drum_scale 叠加
+    # —— 节拍器音量在归一化之后生效, 调节立竿见影, 不再被峰值归一化稀释
     track = np.tanh(track * 1.15) * 0.82
     peak = np.max(np.abs(track)) or 1.0
     track *= (0.85 / peak)
+    drums = np.tanh(track_drums * 1.0) * 0.9
+    dpeak = np.max(np.abs(drums)) or 1.0
+    if dpeak > 1e-6:
+        drums *= (0.85 / dpeak)
+        track = track + drums
+    peak2 = np.max(np.abs(track)) or 1.0
+    if peak2 > 1.0:
+        track *= (1.0 / peak2)
     return track.astype(np.float32)
 
 
