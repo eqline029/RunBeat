@@ -388,8 +388,12 @@ def build_session(plan: dict, seed: int = 7, cache_dir: str = None,
         cue_len = len(cue) / SR
         if t_cue < prev_end + 0.35:              # 与前一条语音重叠/过近 -> 顺延
             t_cue = prev_end + 0.35
-        if t_cue + cue_len > music_len + 0.05:   # 超出音频末尾 -> 丢弃(宁缺勿叠)
-            continue
+        if t_cue + cue_len > music_len + 0.05:
+            # 语音放不下(常见于最后一阶段的“完成前提醒”): 整体前移, 宁早勿缺,
+            # 保证语音完整播完; 前移后仍与上一条冲突或越界, 才放弃该条
+            t_cue = music_len - cue_len - 0.05
+            if t_cue < prev_end + 0.35 or t_cue < 0:
+                continue
         if _apply_cue(music, t_cue, cue, duck_db):
             placed += 1
             prev_end = t_cue + cue_len

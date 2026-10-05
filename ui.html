@@ -53,6 +53,13 @@
   #phaseNav .nav-it:hover .tip { display:block; }
   @media (max-width:720px){ #phaseNav { display:none; } }
   .dur-row { display:flex; align-items:center; gap:4px; }
+  .phase-sel { width:18px; height:18px; accent-color:var(--accent); cursor:pointer; flex:none; }
+  .batch-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .batch-head .count { font-size:13px; color:var(--accent-dark); font-weight:600; }
+  .batch-row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+  .batch-row .field { min-width:96px; }
+  .batch-row .field.small { min-width:70px; }
+  .batch-hint { font-size:12px; color:var(--muted); background:#f7faf9; border:1px dashed var(--line); border-radius:6px; padding:6px 10px; }
   .dur-unit { font-size:12px; color:#667; }
   .phase-loading { display:none; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--accent-dark,#1f6f52); }
   .analyze-wrap { margin-top:10px; max-width:360px; }
@@ -273,6 +280,40 @@
     <div class="hint">鼠标悬浮在模板按钮上可查看课程介绍、阶段结构与适用水平。</div>
   </div>
 
+  <!-- 批量编辑(勾选阶段后出现) -->
+  <div class="card" id="batchCard" style="display:none">
+    <div class="batch-head">
+      <h2 style="margin:0">批量编辑</h2>
+      <span class="count" id="batchCount"></span>
+      <span style="flex:1"></span>
+      <button class="btn small" onclick="selAll()">全选</button>
+      <button class="btn small" onclick="selNone()">清空</button>
+    </div>
+    <div class="batch-row" style="margin-top:10px">
+      <div class="field"><label>统一步频（步/分）</label><input type="number" id="bCad" min="110" max="230" step="1" placeholder="留空不改"></div>
+      <div class="field small"><label>统一时长-分</label><input type="number" id="bDurM" min="0" step="1" placeholder="—"></div>
+      <div class="field small"><label>统一时长-秒</label><input type="number" id="bDurS" min="0" max="59" step="5" placeholder="—"></div>
+      <div class="field"><label>统一提前提醒（结束前N秒）</label><input type="number" id="bLead" min="3" step="1" placeholder="留空不改"></div>
+      <button class="btn primary" onclick="applyUniform()">应用到选中</button>
+    </div>
+    <div class="batch-row">
+      <div class="field"><label>渐变步频 起</label><input type="number" id="gCadA" min="110" max="230" step="1" placeholder="如150"></div>
+      <span class="hint" style="margin:0">→</span>
+      <div class="field"><label>渐变步频 止</label><input type="number" id="gCadB" min="110" max="230" step="1" placeholder="如175"></div>
+      <div class="field small"><label>渐变时长 起-分</label><input type="number" id="gDurMA" min="0" step="1" placeholder="—"></div>
+      <div class="field small"><label>起-秒</label><input type="number" id="gDurSA" min="0" max="59" step="5" placeholder="—"></div>
+      <div class="field small"><label>止-分</label><input type="number" id="gDurMB" min="0" step="1" placeholder="—"></div>
+      <div class="field small"><label>止-秒</label><input type="number" id="gDurSB" min="0" max="59" step="5" placeholder="—"></div>
+      <button class="btn primary" onclick="applyGradient()">应用到选中（等差渐变）</button>
+    </div>
+    <div class="batch-row">
+      <div class="field" style="flex:1"><label>开始提示模板（留空=不改）</label><input type="text" id="tplCue" placeholder="例：第{n}阶段，步频{cadence}，坚持{min}分{sec}秒"></div>
+      <div class="field" style="flex:1"><label>提前提醒模板（留空=不改）</label><input type="text" id="tplPre" placeholder="例：本阶段还剩{sec}秒，请准备切换"></div>
+      <button class="btn primary" onclick="applyCueTpl()">生成并填入选中</button>
+    </div>
+    <div class="batch-hint">占位符：{n}=阶段序号 {cadence}=该阶段步频 {min}/{sec}=该阶段时长（分/秒）。统一与渐变都按选中阶段自上而下的顺序应用。</div>
+  </div>
+
   <!-- 阶段列表 -->
   <div id="phaseList"></div>
   <!-- 侧边阶段全览导航 -->
@@ -327,7 +368,8 @@ const state = {
   phases: [],
   voices: [],
   songStatus: {},   // 兼容旧版阶段歌曲状态
-  globalSong: { song_id:null, song_name:"", song_bpm:null, song_mode:"stretch" }
+  globalSong: { song_id:null, song_name:"", song_bpm:null, song_mode:"stretch" },
+  _sel: new Set()
 };
 let uidSeq = 1;
 
@@ -483,8 +525,11 @@ function render(){
     card.className = "phase"; card.id = "phase-" + p.uid;
 
     // 头部
-    const head = document.createElement("div");
-    head.className = "phase-head";
+    const head = document.createElement("div"); head.className = "phase-head";
+    const sel = document.createElement("input"); sel.type = "checkbox"; sel.className = "phase-sel";
+    sel.checked = state._sel.has(p.uid); sel.title = "勾选后可用于批量编辑";
+    sel.addEventListener("change", ()=>{ if(sel.checked){ state._sel.add(p.uid); } else { state._sel.delete(p.uid); } refreshBatch(); });
+    head.appendChild(sel);
     const idx = document.createElement("span"); idx.className = "idx"; idx.textContent = "阶段 " + (i+1);
     const name = document.createElement("input"); name.type="text"; name.value = p.name;
     name.addEventListener("input", e => { p.name = e.target.value; });
@@ -579,6 +624,63 @@ function render(){
   scheduleSave();
   renderPhaseNav();
   updateNavCurrent();
+  refreshBatch();
+}
+
+// ---------- 批量编辑(多选阶段) ----------
+function refreshBatch(){
+  const card = $("batchCard"); if(!card) return;
+  const n = state._sel.size;
+  card.style.display = n ? "" : "none";
+  const c = $("batchCount"); if(c) c.textContent = "已选 " + n + " 个阶段（按自上而下顺序应用）";
+}
+function selectedPhases(){ return state.phases.filter(p => state._sel.has(p.uid)); }
+function selAll(){ state.phases.forEach(p=>state._sel.add(p.uid)); render(); }
+function selNone(){ state._sel.clear(); render(); }
+function applyUniform(){
+  const phs = selectedPhases(); if(!phs.length){ setStatus("err","请先勾选要批量修改的阶段"); return; }
+  const cad = $("bCad").value.trim();
+  const durM = $("bDurM").value.trim(), durS = $("bDurS").value.trim();
+  const lead = $("bLead").value.trim();
+  let changed = 0;
+  phs.forEach(p=>{
+    if(cad){ p.cadence = Math.max(110, Math.min(230, +cad)); changed++; }
+    if(durM !== "" || durS !== ""){ const m = Math.max(0, parseInt(durM)||0), s = Math.max(0, parseInt(durS)||0); p.duration_min = Math.max(0.2, m + s/60); changed++; }
+    if(lead){ p.pre_cue_lead = Math.max(3, +lead); changed++; }
+  });
+  if(changed){ render(); setStatus("ok","已应用到 " + phs.length + " 个阶段"); }
+  else setStatus("err","请至少填写一项要统一修改的值");
+}
+function applyGradient(){
+  const phs = selectedPhases(); if(!phs.length){ setStatus("err","请先勾选要批量修改的阶段"); return; }
+  const n = phs.length;
+  const cadA = $("gCadA").value.trim(), cadB = $("gCadB").value.trim();
+  const dMA = $("gDurMA").value.trim(), dSA = $("gDurSA").value.trim();
+  const dMB = $("gDurMB").value.trim(), dSB = $("gDurSB").value.trim();
+  const hasCad = cadA !== "" && cadB !== "";
+  const hasDur = (dMA !== "" || dSA !== "") && (dMB !== "" || dSB !== "");
+  if(!hasCad && !hasDur){ setStatus("err","请至少填写一项渐变（步频 或 时长）"); return; }
+  const a = +cadA, b = +cadB;
+  const durA = (+dMA||0) + (+dSA||0)/60, durB = (+dMB||0) + (+dSB||0)/60;
+  phs.forEach((p,k)=>{
+    const t = n > 1 ? k/(n-1) : 1;
+    if(hasCad) p.cadence = Math.max(110, Math.min(230, Math.round(a + (b-a)*t)));
+    if(hasDur) p.duration_min = Math.max(0.2, +(durA + (durB-durA)*t).toFixed(2));
+  });
+  render(); setStatus("ok","渐变已应用到 " + n + " 个阶段");
+}
+function applyCueTpl(){
+  const phs = selectedPhases(); if(!phs.length){ setStatus("err","请先勾选要批量修改的阶段"); return; }
+  const tCue = $("tplCue").value, tPre = $("tplPre").value;
+  if(!tCue.trim() && !tPre.trim()){ setStatus("err","请至少填写一个文案模板"); return; }
+  phs.forEach(p=>{
+    const i = state.phases.indexOf(p) + 1;
+    const m = Math.floor(+p.duration_min||0), s = Math.round((+p.duration_min - m)*60);
+    const rep = t => t.replace(/\{n\}/g, i).replace(/\{cadence\}/g, p.cadence).replace(/\{min\}/g, m).replace(/\{sec\}/g, s);
+    if(tCue.trim()) p.cue = rep(tCue);
+    if(tPre.trim()) p.pre_cue = rep(tPre);
+  });
+  render(); setStatus("ok","文案模板已填入 " + phs.length + " 个阶段");
 }
 
 // ---------- 侧边阶段全览导航 ----------
