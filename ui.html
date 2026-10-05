@@ -59,6 +59,8 @@
   .batch-row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
   .batch-row .field { min-width:96px; }
   .batch-row .field.small { min-width:70px; }
+  .grad-toggle { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); white-space:nowrap; padding-bottom:4px; cursor:pointer; }
+  .grad-toggle input { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
   .batch-hint { font-size:12px; color:var(--muted); background:#f7faf9; border:1px dashed var(--line); border-radius:6px; padding:6px 10px; }
   .dur-unit { font-size:12px; color:#667; }
   .phase-loading { display:none; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--accent-dark,#1f6f52); }
@@ -297,6 +299,7 @@
       <button class="btn primary" onclick="applyUniform()">应用到选中</button>
     </div>
     <div class="batch-row">
+      <label class="grad-toggle"><input type="checkbox" id="gEnabled" checked> 启用渐变（等差递进）</label>
       <div class="field"><label>渐变步频 起</label><input type="number" id="gCadA" min="110" max="230" step="1" placeholder="如150"></div>
       <span class="hint" style="margin:0">→</span>
       <div class="field"><label>渐变步频 止</label><input type="number" id="gCadB" min="110" max="230" step="1" placeholder="如175"></div>
@@ -367,6 +370,32 @@
 const state = {
   phases: [],
   voices: [],
+  VOICE_CN: {
+    "zh-CN-XiaoxiaoNeural": "晓晓（女·温柔清晰）",
+    "zh-CN-XiaoyiNeural": "晓伊（女·活泼）",
+    "zh-CN-YunxiNeural": "云希（男·少年感）",
+    "zh-CN-YunjianNeural": "云健（男·沉稳）",
+    "zh-CN-YunyangNeural": "云扬（男·新闻感）",
+    "zh-CN-YunxiaNeural": "云夏（男·青春）",
+    "zh-CN-XiaochenNeural": "晓辰（女·温暖）",
+    "zh-CN-XiaohanNeural": "晓涵（女·温和）",
+    "zh-CN-XiaomengNeural": "晓梦（女·甜美）",
+    "zh-CN-XiaomoNeural": "晓墨（女·成熟）",
+    "zh-CN-XiaoqiuNeural": "晓秋（女·元气）",
+    "zh-CN-XiaoruiNeural": "晓睿（女·知性）",
+    "zh-CN-XiaoshuangNeural": "晓双（女·开朗）",
+    "zh-CN-XiaoyanNeural": "晓颜（女·自然）",
+    "zh-CN-XiaoyouNeural": "晓悠（女·轻柔）",
+    "zh-CN-XiaozhenNeural": "晓甄（女·温柔）",
+    "zh-CN-YunfengNeural": "云枫（男·成熟）",
+    "zh-CN-YunhaoNeural": "云皓（男·明亮）",
+    "zh-CN-YunjieNeural": "云杰（男·爽朗）",
+    "zh-CN-YunxiangNeural": "云翔（男·沉稳）",
+    "zh-CN-YunyeNeural": "云野（男·松弛）",
+    "zh-CN-YunzeNeural": "云泽（男·自然）",
+    "zh-CN-liaoning-XiaobeiNeural": "晓北（辽宁·女）",
+    "zh-CN-shaanxi-XiaoniNeural": "晓妮（陕西·女）",
+  },
   songStatus: {},   // 兼容旧版阶段歌曲状态
   globalSong: { song_id:null, song_name:"", song_bpm:null, song_mode:"stretch" },
   _sel: new Set()
@@ -653,6 +682,7 @@ function applyUniform(){
 }
 function applyGradient(){
   const phs = selectedPhases(); if(!phs.length){ setStatus("err","请先勾选要批量修改的阶段"); return; }
+  if(!$("gEnabled").checked){ setStatus("err","请先勾选「启用渐变」开关（仅统一设置可直接应用）"); return; }
   const n = phs.length;
   const cadA = $("gCadA").value.trim(), cadB = $("gCadB").value.trim();
   const dMA = $("gDurMA").value.trim(), dSA = $("gDurSA").value.trim();
@@ -1298,7 +1328,7 @@ document.addEventListener("change", ()=>scheduleSave(), true);
     state.voices = j.voices || [];
     const sel = $("voice");
     sel.textContent = "";
-    state.voices.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=v; sel.appendChild(o); });
+    state.voices.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=state.VOICE_CN[v] || v; sel.appendChild(o); });
     sel.value = state.voices.includes("zh-CN-YunxiNeural") ? "zh-CN-YunxiNeural" : (state.voices[0]||"");
   }catch(e){ console.warn("音色加载失败", e); }
   let restored = false;
